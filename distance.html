@@ -426,17 +426,17 @@
   </nav>
 
   <h1>Distance & Weather Comparison</h1>
-  <p class="subtitle">Enter two US zip codes to compare weather and calculate distance</p>
+  <p class="subtitle">Enter two US addresses to compare weather and get driving directions</p>
 
   <div class="search-row">
     <div class="zip-group">
       <label>Location A</label>
-      <input type="text" id="zipA" placeholder="e.g. 10001" maxlength="5" inputmode="numeric" />
+      <input type="text" id="zipA" placeholder="e.g. 1600 Pennsylvania Ave, Washington DC" autocomplete="off" />
     </div>
     <div class="vs-badge">VS</div>
     <div class="zip-group">
       <label>Location B</label>
-      <input type="text" id="zipB" placeholder="e.g. 90001" maxlength="5" inputmode="numeric" />
+      <input type="text" id="zipB" placeholder="e.g. Times Square, New York NY" autocomplete="off" />
     </div>
     <button class="search-btn" id="compareBtn">Compare</button>
   </div>
@@ -599,15 +599,23 @@
       return [miles, miles * 1.60934];
     }
 
-    async function fetchGeo(zip) {
-      const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
-      if (!res.ok) throw new Error(`Zip code ${zip} not found.`);
-      const d = await res.json();
+    async function fetchGeo(address) {
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        new URLSearchParams({ q: address, countrycodes: 'us', format: 'json', limit: 1, addressdetails: 1 });
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      if (!res.ok) throw new Error(`Could not geocode: "${address}"`);
+      const data = await res.json();
+      if (!data.length) throw new Error(`Address not found: "${address}". Try adding a city or state.`);
+      const place = data[0];
+      const addr  = place.address;
+      const city  = addr.city || addr.town || addr.village || addr.county || addr.state || '';
+      const state = addr.state || '';
       return {
-        lat: parseFloat(d.places[0].latitude),
-        lon: parseFloat(d.places[0].longitude),
-        city: d.places[0]['place name'],
-        state: d.places[0]['state abbreviation'],
+        lat:     parseFloat(place.lat),
+        lon:     parseFloat(place.lon),
+        city,
+        state,
+        display: place.display_name.split(',').slice(0, 3).join(','),
       };
     }
 
@@ -629,10 +637,11 @@
       return (await res.json()).current;
     }
 
-    function fillCard(suffix, geo, wx, zip) {
+    function fillCard(suffix, geo, wx, address) {
       const info = wmo(wx.weather_code);
-      document.getElementById(`locName${suffix}`).textContent = `${geo.city}, ${geo.state}`;
-      document.getElementById(`locSub${suffix}`).textContent = `ZIP ${zip}`;
+      document.getElementById(`locName${suffix}`).textContent = geo.city
+        ? `${geo.city}${geo.state ? ', ' + geo.state : ''}` : geo.display;
+      document.getElementById(`locSub${suffix}`).textContent = address;
       document.getElementById(`icon${suffix}`).textContent = info.icon;
       document.getElementById(`temp${suffix}`).innerHTML =
         `${Math.round(wx.temperature_2m)}<span class="temp-unit">°F</span>`;
@@ -827,12 +836,8 @@
       const zipA = document.getElementById('zipA').value.trim();
       const zipB = document.getElementById('zipB').value.trim();
 
-      if (!/^\d{5}$/.test(zipA) || !/^\d{5}$/.test(zipB)) {
-        showError('Please enter valid 5-digit US zip codes for both locations.');
-        return;
-      }
-      if (zipA === zipB) {
-        showError('Please enter two different zip codes.');
+      if (!zipA || !zipB) {
+        showError('Please enter addresses for both locations.');
         return;
       }
 
@@ -853,6 +858,11 @@
 
         fillCard('A', geoA, wxA, zipA);
         fillCard('B', geoB, wxB, zipB);
+
+        // Warn if same coords returned (Nominatim sometimes dedupes)
+        if (Math.abs(geoA.lat - geoB.lat) < 0.001 && Math.abs(geoA.lon - geoB.lon) < 0.001) {
+          throw new Error('Both addresses resolved to the same location. Please be more specific.');
+        }
 
         // Straight-line
         const [miles, km] = haversine(geoA.lat, geoA.lon, geoB.lat, geoB.lon);
@@ -882,8 +892,8 @@
         document.getElementById('results').classList.add('visible');
         document.getElementById('mapWrap').classList.add('visible');
 
-        const labelA = `${geoA.city}, ${geoA.state} (${zipA})`;
-        const labelB = `${geoB.city}, ${geoB.state} (${zipB})`;
+        const labelA = geoA.display;
+        const labelB = geoB.display;
 
         renderMap(geoA, geoB, labelA, labelB,
           miles.toLocaleString('en-US', { maximumFractionDigits: 1 }), routeData);
