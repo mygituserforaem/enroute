@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>US Weather</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #e0f0ff 0%, #c8e4fb 50%, #dceffe 100%);
+      color: #1a2a3a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      color: #1a3a5c;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #5577aa;
+      margin-bottom: 32px;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 32px;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 14px 18px;
+      border: 2px solid #90bde0;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #1a2a3a;
+      font-size: 1.1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      box-shadow: 0 2px 8px rgba(100,160,220,0.15);
+    }
+
+    .search-box input::placeholder { color: #99aabb; }
+    .search-box input:focus { border-color: #2e86de; }
+
+    .search-box button {
+      padding: 14px 22px;
+      border: none;
+      border-radius: 12px;
+      background: #2e86de;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.3);
+    }
+
+    .search-box button:hover { background: #1a6fc4; }
+    .search-box button:active { transform: scale(0.97); }
+
+    .error {
+      color: #d63031;
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 8px 32px rgba(46,134,222,0.12);
+      display: none;
+    }
+
+    .card.visible { display: block; }
+
+    .location {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-bottom: 4px;
+    }
+
+    .location-sub {
+      font-size: 0.85rem;
+      color: #6688aa;
+      margin-bottom: 24px;
+    }
+
+    .current-weather {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .weather-icon {
+      font-size: 4rem;
+      line-height: 1;
+    }
+
+    .temp-main {
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: #1a3a5c;
+      line-height: 1;
+    }
+
+    .temp-unit {
+      font-size: 1.4rem;
+      color: #6688aa;
+      vertical-align: super;
+    }
+
+    .condition {
+      font-size: 1rem;
+      color: #4477aa;
+      margin-top: 4px;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .detail-item {
+      background: #f0f7ff;
+      border: 1px solid #d0e8f8;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .detail-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #7799bb;
+      margin-bottom: 4px;
+    }
+
+    .detail-value {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #1a3a5c;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #d8eaf8;
+      margin: 24px 0;
+    }
+
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7799bb;
+      margin-bottom: 14px;
+    }
+
+    .hourly-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: #90bde0 transparent;
+    }
+
+    .hourly-item {
+      flex-shrink: 0;
+      background: #f0f7ff;
+      border: 1px solid #d0e8f8;
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      min-width: 64px;
+    }
+
+    .hourly-time { font-size: 0.75rem; color: #7799bb; margin-bottom: 6px; }
+    .hourly-icon { font-size: 1.4rem; margin-bottom: 6px; }
+    .hourly-temp { font-size: 0.95rem; font-weight: 600; color: #1a3a5c; }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #c8dff5;
+      border-top-color: #2e86de;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+      margin: 20px auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner.active { display: block; }
+
+    /* ── Map ── */
+    .map-wrap {
+      width: 100%;
+      max-width: 760px;
+      margin-top: 28px;
+      display: none;
+    }
+    .map-wrap.visible { display: block; }
+
+    .map-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7799bb;
+      margin-bottom: 10px;
+    }
+
+    #map {
+      width: 100%;
+      height: 400px;
+      border-radius: 16px;
+      border: 1px solid #c8dff5;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(46,134,222,0.12);
+    }
+
+    /* Pulsing marker ring */
+    .pulse-marker {
+      position: relative;
+      width: 22px;
+      height: 22px;
+    }
+    .pulse-dot {
+      position: absolute;
+      inset: 0;
+      background: #ff3d3d;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 3px #ff3d3d;
+    }
+    .pulse-ring {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 3px solid #ff3d3d;
+      animation: pulse-anim 1.6s ease-out infinite;
+      opacity: 0;
+    }
+    @keyframes pulse-anim {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    @media (max-width: 480px) {
+      .temp-main { font-size: 2.8rem; }
+      .card { padding: 20px 18px; }
+      #map { height: 280px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>US Weather</h1>
+  <p class="subtitle">Enter a US zip code to get current conditions</p>
+
+  <div class="search-box">
+    <input type="text" id="zipInput" placeholder="e.g. 10001" maxlength="5" inputmode="numeric" pattern="\d{5}" />
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+  <div class="spinner" id="spinner"></div>
+
+  <!-- Map -->
+  <div class="map-wrap" id="mapWrap">
+    <div class="map-label">Location on Map</div>
+    <div id="map"></div>
+  </div>
+
+  <div class="card" id="weatherCard">
+    <div class="location" id="locationName"></div>
+    <div class="location-sub" id="locationSub"></div>
+
+    <div class="current-weather">
+      <div class="weather-icon" id="weatherIcon"></div>
+      <div>
+        <div class="temp-main" id="temperature"></div>
+        <div class="condition" id="condition"></div>
+      </div>
+    </div>
+
+    <div class="details-grid">
+      <div class="detail-item">
+        <div class="detail-label">Feels Like</div>
+        <div class="detail-value" id="feelsLike">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Humidity</div>
+        <div class="detail-value" id="humidity">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Wind Speed</div>
+        <div class="detail-value" id="windSpeed">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Wind Direction</div>
+        <div class="detail-value" id="windDir">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Visibility</div>
+        <div class="detail-value" id="visibility">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">UV Index</div>
+        <div class="detail-value" id="uvIndex">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Precipitation</div>
+        <div class="detail-value" id="precip">--</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Dew Point</div>
+        <div class="detail-value" id="dewPoint">--</div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="section-title">Next 12 Hours</div>
+    <div class="hourly-scroll" id="hourlyForecast"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Map setup ──
+    let map = null;
+    let marker = null;
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map', {
+        center: [39.5, -98.35],   // geographic center of contiguous US
+        zoom: 4,
+        zoomControl: true,
+        scrollWheelZoom: false,
+      });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }).addTo(map);
+    }
+
+    function placeMarker(lat, lon, label) {
+      initMap();
+
+      // Remove old marker
+      if (marker) { map.removeLayer(marker); marker = null; }
+
+      // Custom pulsing HTML icon
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="pulse-marker"><div class="pulse-ring"></div><div class="pulse-dot"></div></div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+        popupAnchor: [0, -14],
+      });
+
+      marker = L.marker([lat, lon], { icon }).addTo(map);
+      marker.bindPopup(`<strong>${label}</strong>`, { className: 'map-popup' }).openPopup();
+
+      // Fly to location, zoom in enough to show city-level
+      map.flyTo([lat, lon], 9, { duration: 1.4 });
+    }
+
+    const WMO_CODES = {
+      0:   { label: 'Clear Sky',            icon: '☀️' },
+      1:   { label: 'Mainly Clear',         icon: '🌤️' },
+      2:   { label: 'Partly Cloudy',        icon: '⛅' },
+      3:   { label: 'Overcast',             icon: '☁️' },
+      45:  { label: 'Foggy',                icon: '🌫️' },
+      48:  { label: 'Icy Fog',              icon: '🌫️' },
+      51:  { label: 'Light Drizzle',        icon: '🌦️' },
+      53:  { label: 'Drizzle',              icon: '🌦️' },
+      55:  { label: 'Heavy Drizzle',        icon: '🌧️' },
+      61:  { label: 'Light Rain',           icon: '🌧️' },
+      63:  { label: 'Rain',                 icon: '🌧️' },
+      65:  { label: 'Heavy Rain',           icon: '🌧️' },
+      71:  { label: 'Light Snow',           icon: '🌨️' },
+      73:  { label: 'Snow',                 icon: '❄️' },
+      75:  { label: 'Heavy Snow',           icon: '❄️' },
+      77:  { label: 'Snow Grains',          icon: '🌨️' },
+      80:  { label: 'Light Showers',        icon: '🌦️' },
+      81:  { label: 'Showers',              icon: '🌧️' },
+      82:  { label: 'Heavy Showers',        icon: '⛈️' },
+      85:  { label: 'Snow Showers',         icon: '🌨️' },
+      86:  { label: 'Heavy Snow Showers',   icon: '❄️' },
+      95:  { label: 'Thunderstorm',         icon: '⛈️' },
+      96:  { label: 'Thunderstorm w/ Hail', icon: '⛈️' },
+      99:  { label: 'Thunderstorm w/ Hail', icon: '⛈️' },
+    };
+
+    function wmo(code) {
+      return WMO_CODES[code] ?? { label: 'Unknown', icon: '🌡️' };
+    }
+
+    function windDirLabel(deg) {
+      const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      return dirs[Math.round(deg / 45) % 8];
+    }
+
+    function formatHour(isoString) {
+      const d = new Date(isoString);
+      const h = d.getHours();
+      return h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+    }
+
+    function showError(msg) {
+      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('weatherCard').classList.remove('visible');
+      document.getElementById('mapWrap').classList.remove('visible');
+    }
+
+    function clearError() {
+      document.getElementById('errorMsg').textContent = '';
+    }
+
+    async function fetchWeather() {
+      const zip = document.getElementById('zipInput').value.trim();
+
+      if (!/^\d{5}$/.test(zip)) {
+        showError('Please enter a valid 5-digit US zip code.');
+        return;
+      }
+
+      clearError();
+      document.getElementById('spinner').classList.add('active');
+      document.getElementById('weatherCard').classList.remove('visible');
+
+      try {
+        // Step 1: zip → lat/lon via Zippopotam.us
+        const geoRes = await fetch(`https://api.zippopotam.us/us/${zip}`);
+        if (!geoRes.ok) throw new Error('Zip code not found. Please check and try again.');
+        const geoData = await geoRes.json();
+
+        const { latitude, longitude } = geoData.places[0];
+        const city  = geoData.places[0]['place name'];
+        const state = geoData.places[0]['state abbreviation'];
+
+        // Step 2: weather via Open-Meteo (free, no key)
+        const params = new URLSearchParams({
+          latitude, longitude,
+          current: [
+            'temperature_2m','apparent_temperature','relative_humidity_2m',
+            'weather_code','wind_speed_10m','wind_direction_10m',
+            'visibility','uv_index','precipitation','dew_point_2m'
+          ].join(','),
+          hourly: ['temperature_2m','weather_code'].join(','),
+          temperature_unit: 'fahrenheit',
+          wind_speed_unit: 'mph',
+          precipitation_unit: 'inch',
+          timezone: 'America/New_York',
+          forecast_days: 1,
+        });
+
+        const wxRes = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+        if (!wxRes.ok) throw new Error('Weather data unavailable. Please try again.');
+        const wx = await wxRes.json();
+
+        const cur = wx.current;
+        const wmoInfo = wmo(cur.weather_code);
+
+        // Fill card
+        document.getElementById('locationName').textContent = `${city}, ${state}`;
+        document.getElementById('locationSub').textContent = `ZIP ${zip} · Lat ${parseFloat(latitude).toFixed(2)}, Lon ${parseFloat(longitude).toFixed(2)}`;
+        document.getElementById('weatherIcon').textContent = wmoInfo.icon;
+        document.getElementById('temperature').innerHTML = `${Math.round(cur.temperature_2m)}<span class="temp-unit">°F</span>`;
+        document.getElementById('condition').textContent = wmoInfo.label;
+        document.getElementById('feelsLike').textContent = `${Math.round(cur.apparent_temperature)}°F`;
+        document.getElementById('humidity').textContent = `${cur.relative_humidity_2m}%`;
+        document.getElementById('windSpeed').textContent = `${Math.round(cur.wind_speed_10m)} mph`;
+        document.getElementById('windDir').textContent = windDirLabel(cur.wind_direction_10m);
+        document.getElementById('visibility').textContent = cur.visibility != null
+          ? `${(cur.visibility / 5280).toFixed(1)} mi` : '--';
+        document.getElementById('uvIndex').textContent = cur.uv_index ?? '--';
+        document.getElementById('precip').textContent = `${cur.precipitation ?? 0} in`;
+        document.getElementById('dewPoint').textContent = `${Math.round(cur.dew_point_2m)}°F`;
+
+        // Hourly — next 12 slots from now
+        const now = new Date();
+        const hourlyEl = document.getElementById('hourlyForecast');
+        hourlyEl.innerHTML = '';
+        let shown = 0;
+        for (let i = 0; i < wx.hourly.time.length && shown < 12; i++) {
+          if (new Date(wx.hourly.time[i]) >= now) {
+            const hi = document.createElement('div');
+            hi.className = 'hourly-item';
+            hi.innerHTML = `
+              <div class="hourly-time">${formatHour(wx.hourly.time[i])}</div>
+              <div class="hourly-icon">${wmo(wx.hourly.weather_code[i]).icon}</div>
+              <div class="hourly-temp">${Math.round(wx.hourly.temperature_2m[i])}°F</div>
+            `;
+            hourlyEl.appendChild(hi);
+            shown++;
+          }
+        }
+
+        // Show map and place marker
+        document.getElementById('mapWrap').classList.add('visible');
+        placeMarker(parseFloat(latitude), parseFloat(longitude), `${city}, ${state} ${zip}`);
+
+        document.getElementById('weatherCard').classList.add('visible');
+      } catch (err) {
+        showError(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        document.getElementById('spinner').classList.remove('active');
+      }
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', fetchWeather);
+    document.getElementById('zipInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchWeather();
+    });
+  </script>
+</body>
+</html>
