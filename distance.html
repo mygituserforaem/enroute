@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Distance & Weather Comparison</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #e0f0ff 0%, #c8e4fb 50%, #dceffe 100%);
+      color: #1a2a3a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    nav a {
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: #2e86de;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      box-shadow: 0 2px 6px rgba(46,134,222,0.1);
+      transition: background 0.2s;
+    }
+    nav a:hover { background: #e8f3ff; }
+    nav a.active { background: #2e86de; color: #fff; border-color: #2e86de; }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      color: #1a3a5c;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: #5577aa;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    /* ── Search row ── */
+    .search-row {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 12px;
+      align-items: flex-end;
+    }
+
+    .zip-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .zip-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #5577aa;
+    }
+    .zip-group input {
+      padding: 13px 16px;
+      border: 2px solid #90bde0;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #1a2a3a;
+      font-size: 1.05rem;
+      outline: none;
+      transition: border-color 0.2s;
+      box-shadow: 0 2px 8px rgba(100,160,220,0.15);
+    }
+    .zip-group input::placeholder { color: #99aabb; }
+    .zip-group input:focus { border-color: #2e86de; }
+
+    .vs-badge {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #7799bb;
+      padding-bottom: 13px;
+    }
+
+    .search-btn {
+      padding: 13px 24px;
+      border: none;
+      border-radius: 12px;
+      background: #2e86de;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.3);
+      white-space: nowrap;
+    }
+    .search-btn:hover { background: #1a6fc4; }
+    .search-btn:active { transform: scale(0.97); }
+
+    .error {
+      color: #d63031;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #c8dff5;
+      border-top-color: #2e86de;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+      margin: 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner.active { display: block; }
+
+    /* ── Distance banner ── */
+    .distance-banner {
+      width: 100%;
+      max-width: 1100px;
+      background: #2e86de;
+      border-radius: 16px;
+      padding: 18px 28px;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(46,134,222,0.25);
+    }
+    .distance-banner.visible { display: flex; }
+    .distance-banner .label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .distance-banner .value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .distance-banner .sep { color: rgba(255,255,255,0.4); font-size: 1.2rem; }
+
+    /* ── Results grid ── */
+    .results {
+      width: 100%;
+      max-width: 1100px;
+      display: none;
+      gap: 24px;
+    }
+    .results.visible { display: grid; grid-template-columns: 1fr 1fr; }
+
+    /* ── Weather card ── */
+    .card {
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-radius: 20px;
+      padding: 24px 28px;
+      box-shadow: 0 8px 32px rgba(46,134,222,0.12);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-a { background: #ff3d3d; }
+    .dot-b { background: #2e86de; }
+
+    .location { font-size: 1.2rem; font-weight: 700; color: #1a3a5c; }
+    .location-sub { font-size: 0.8rem; color: #6688aa; margin-top: 2px; }
+
+    .current-weather {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #d8eaf8;
+    }
+    .weather-icon { font-size: 3.2rem; line-height: 1; }
+    .temp-main { font-size: 3rem; font-weight: 700; color: #1a3a5c; line-height: 1; }
+    .temp-unit { font-size: 1.2rem; color: #6688aa; vertical-align: super; }
+    .condition { font-size: 0.95rem; color: #4477aa; margin-top: 4px; }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .detail-item {
+      background: #f0f7ff;
+      border: 1px solid #d0e8f8;
+      border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .detail-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #7799bb;
+      margin-bottom: 3px;
+    }
+    .detail-value { font-size: 1rem; font-weight: 600; color: #1a3a5c; }
+
+    /* ── Map ── */
+    .map-wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 24px;
+      display: none;
+    }
+    .map-wrap.visible { display: block; }
+    .map-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7799bb;
+      margin-bottom: 10px;
+    }
+    #map {
+      width: 100%;
+      height: 420px;
+      border-radius: 16px;
+      border: 1px solid #c8dff5;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(46,134,222,0.12);
+    }
+
+    /* Pulsing marker */
+    .pulse-marker { position: relative; width: 18px; height: 18px; }
+    .pulse-dot {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 3px solid #fff;
+    }
+    .pulse-ring {
+      position: absolute; inset: -8px;
+      border-radius: 50%;
+      border: 3px solid;
+      animation: pulse-anim 1.6s ease-out infinite;
+      opacity: 0;
+    }
+    @keyframes pulse-anim {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    @media (max-width: 860px) {
+      .results.visible { grid-template-columns: 1fr; }
+      .search-row { flex-wrap: wrap; }
+      .vs-badge { display: none; }
+    }
+    @media (max-width: 480px) {
+      .temp-main { font-size: 2.4rem; }
+      .card { padding: 18px 16px; }
+      #map { height: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html">Current Weather</a>
+    <a href="distance.html" class="active">Distance & Compare</a>
+  </nav>
+
+  <h1>Distance & Weather Comparison</h1>
+  <p class="subtitle">Enter two US zip codes to compare weather and calculate distance</p>
+
+  <div class="search-row">
+    <div class="zip-group">
+      <label>Location A</label>
+      <input type="text" id="zipA" placeholder="e.g. 10001" maxlength="5" inputmode="numeric" />
+    </div>
+    <div class="vs-badge">VS</div>
+    <div class="zip-group">
+      <label>Location B</label>
+      <input type="text" id="zipB" placeholder="e.g. 90001" maxlength="5" inputmode="numeric" />
+    </div>
+    <button class="search-btn" id="compareBtn">Compare</button>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+  <div class="spinner" id="spinner"></div>
+
+  <!-- Distance banner -->
+  <div class="distance-banner" id="distanceBanner">
+    <span class="label">Straight-line Distance</span>
+    <span class="value" id="distMiles">--</span>
+    <span class="sep">|</span>
+    <span class="value" id="distKm">--</span>
+  </div>
+
+  <!-- Side-by-side weather cards -->
+  <div class="results" id="results">
+    <div class="card" id="cardA">
+      <div class="card-header">
+        <div class="dot dot-a"></div>
+        <div>
+          <div class="location" id="locNameA"></div>
+          <div class="location-sub" id="locSubA"></div>
+        </div>
+      </div>
+      <div class="current-weather">
+        <div class="weather-icon" id="iconA"></div>
+        <div>
+          <div class="temp-main" id="tempA"></div>
+          <div class="condition" id="condA"></div>
+        </div>
+      </div>
+      <div class="details-grid">
+        <div class="detail-item"><div class="detail-label">Feels Like</div><div class="detail-value" id="feelsA">--</div></div>
+        <div class="detail-item"><div class="detail-label">Humidity</div><div class="detail-value" id="humidA">--</div></div>
+        <div class="detail-item"><div class="detail-label">Wind</div><div class="detail-value" id="windA">--</div></div>
+        <div class="detail-item"><div class="detail-label">UV Index</div><div class="detail-value" id="uvA">--</div></div>
+        <div class="detail-item"><div class="detail-label">Visibility</div><div class="detail-value" id="visA">--</div></div>
+        <div class="detail-item"><div class="detail-label">Precipitation</div><div class="detail-value" id="precipA">--</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="cardB">
+      <div class="card-header">
+        <div class="dot dot-b"></div>
+        <div>
+          <div class="location" id="locNameB"></div>
+          <div class="location-sub" id="locSubB"></div>
+        </div>
+      </div>
+      <div class="current-weather">
+        <div class="weather-icon" id="iconB"></div>
+        <div>
+          <div class="temp-main" id="tempB"></div>
+          <div class="condition" id="condB"></div>
+        </div>
+      </div>
+      <div class="details-grid">
+        <div class="detail-item"><div class="detail-label">Feels Like</div><div class="detail-value" id="feelsB">--</div></div>
+        <div class="detail-item"><div class="detail-label">Humidity</div><div class="detail-value" id="humidB">--</div></div>
+        <div class="detail-item"><div class="detail-label">Wind</div><div class="detail-value" id="windB">--</div></div>
+        <div class="detail-item"><div class="detail-label">UV Index</div><div class="detail-value" id="uvB">--</div></div>
+        <div class="detail-item"><div class="detail-label">Visibility</div><div class="detail-value" id="visB">--</div></div>
+        <div class="detail-item"><div class="detail-label">Precipitation</div><div class="detail-value" id="precipB">--</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map with both pins and connecting line -->
+  <div class="map-wrap" id="mapWrap">
+    <div class="map-label">Locations on Map</div>
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const WMO_CODES = {
+      0:  { label: 'Clear Sky',            icon: '☀️' },
+      1:  { label: 'Mainly Clear',         icon: '🌤️' },
+      2:  { label: 'Partly Cloudy',        icon: '⛅' },
+      3:  { label: 'Overcast',             icon: '☁️' },
+      45: { label: 'Foggy',                icon: '🌫️' },
+      48: { label: 'Icy Fog',              icon: '🌫️' },
+      51: { label: 'Light Drizzle',        icon: '🌦️' },
+      53: { label: 'Drizzle',              icon: '🌦️' },
+      55: { label: 'Heavy Drizzle',        icon: '🌧️' },
+      61: { label: 'Light Rain',           icon: '🌧️' },
+      63: { label: 'Rain',                 icon: '🌧️' },
+      65: { label: 'Heavy Rain',           icon: '🌧️' },
+      71: { label: 'Light Snow',           icon: '🌨️' },
+      73: { label: 'Snow',                 icon: '❄️' },
+      75: { label: 'Heavy Snow',           icon: '❄️' },
+      80: { label: 'Light Showers',        icon: '🌦️' },
+      81: { label: 'Showers',              icon: '🌧️' },
+      82: { label: 'Heavy Showers',        icon: '⛈️' },
+      95: { label: 'Thunderstorm',         icon: '⛈️' },
+      96: { label: 'Thunderstorm w/ Hail', icon: '⛈️' },
+      99: { label: 'Thunderstorm w/ Hail', icon: '⛈️' },
+    };
+
+    function wmo(code) { return WMO_CODES[code] ?? { label: 'Unknown', icon: '🌡️' }; }
+
+    function windDir(deg) {
+      const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      return dirs[Math.round(deg / 45) % 8];
+    }
+
+    // Haversine formula — returns [miles, km]
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 3958.8; // Earth radius in miles
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      const miles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return [miles, miles * 1.60934];
+    }
+
+    async function fetchGeo(zip) {
+      const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
+      if (!res.ok) throw new Error(`Zip code ${zip} not found.`);
+      const d = await res.json();
+      return {
+        lat: parseFloat(d.places[0].latitude),
+        lon: parseFloat(d.places[0].longitude),
+        city: d.places[0]['place name'],
+        state: d.places[0]['state abbreviation'],
+      };
+    }
+
+    async function fetchWeather(lat, lon) {
+      const params = new URLSearchParams({
+        latitude: lat, longitude: lon,
+        current: [
+          'temperature_2m','apparent_temperature','relative_humidity_2m',
+          'weather_code','wind_speed_10m','wind_direction_10m',
+          'visibility','uv_index','precipitation'
+        ].join(','),
+        temperature_unit: 'fahrenheit',
+        wind_speed_unit: 'mph',
+        precipitation_unit: 'inch',
+        timezone: 'America/New_York',
+      });
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+      if (!res.ok) throw new Error('Weather data unavailable.');
+      return (await res.json()).current;
+    }
+
+    function fillCard(suffix, geo, wx, zip) {
+      const info = wmo(wx.weather_code);
+      document.getElementById(`locName${suffix}`).textContent = `${geo.city}, ${geo.state}`;
+      document.getElementById(`locSub${suffix}`).textContent = `ZIP ${zip}`;
+      document.getElementById(`icon${suffix}`).textContent = info.icon;
+      document.getElementById(`temp${suffix}`).innerHTML =
+        `${Math.round(wx.temperature_2m)}<span class="temp-unit">°F</span>`;
+      document.getElementById(`cond${suffix}`).textContent = info.label;
+      document.getElementById(`feels${suffix}`).textContent = `${Math.round(wx.apparent_temperature)}°F`;
+      document.getElementById(`humid${suffix}`).textContent = `${wx.relative_humidity_2m}%`;
+      document.getElementById(`wind${suffix}`).textContent =
+        `${Math.round(wx.wind_speed_10m)} mph ${windDir(wx.wind_direction_10m)}`;
+      document.getElementById(`uv${suffix}`).textContent = wx.uv_index ?? '--';
+      document.getElementById(`vis${suffix}`).textContent =
+        wx.visibility != null ? `${(wx.visibility / 5280).toFixed(1)} mi` : '--';
+      document.getElementById(`precip${suffix}`).textContent = `${wx.precipitation ?? 0} in`;
+    }
+
+    // ── Map ──
+    let map = null;
+    let layerGroup = null;
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map', { center: [39.5, -98.35], zoom: 4, scrollWheelZoom: false });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
+      }).addTo(map);
+      layerGroup = L.layerGroup().addTo(map);
+    }
+
+    function makeIcon(color) {
+      return L.divIcon({
+        className: '',
+        html: `<div class="pulse-marker">
+          <div class="pulse-ring" style="border-color:${color}"></div>
+          <div class="pulse-dot" style="background:${color};box-shadow:0 0 0 3px ${color}"></div>
+        </div>`,
+        iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -12],
+      });
+    }
+
+    function renderMap(geoA, geoB, labelA, labelB, distMiles) {
+      initMap();
+      layerGroup.clearLayers();
+
+      const mA = L.marker([geoA.lat, geoA.lon], { icon: makeIcon('#ff3d3d') }).addTo(layerGroup);
+      mA.bindPopup(`<strong>${labelA}</strong>`).openPopup();
+
+      const mB = L.marker([geoB.lat, geoB.lon], { icon: makeIcon('#2e86de') }).addTo(layerGroup);
+      mB.bindPopup(`<strong>${labelB}</strong>`);
+
+      // Dashed line between the two points
+      L.polyline([[geoA.lat, geoA.lon], [geoB.lat, geoB.lon]], {
+        color: '#2e86de', weight: 2.5, dashArray: '8 6', opacity: 0.7,
+      }).addTo(layerGroup);
+
+      // Midpoint label
+      const midLat = (geoA.lat + geoB.lat) / 2;
+      const midLon = (geoA.lon + geoB.lon) / 2;
+      L.marker([midLat, midLon], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:#2e86de;color:#fff;padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2)">${distMiles} mi</div>`,
+          iconAnchor: [40, 12],
+        }),
+        interactive: false,
+      }).addTo(layerGroup);
+
+      map.fitBounds([[geoA.lat, geoA.lon], [geoB.lat, geoB.lon]], { padding: [60, 60] });
+    }
+
+    // ── Main ──
+    function showError(msg) {
+      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('results').classList.remove('visible');
+      document.getElementById('distanceBanner').classList.remove('visible');
+      document.getElementById('mapWrap').classList.remove('visible');
+    }
+
+    async function compare() {
+      const zipA = document.getElementById('zipA').value.trim();
+      const zipB = document.getElementById('zipB').value.trim();
+
+      if (!/^\d{5}$/.test(zipA) || !/^\d{5}$/.test(zipB)) {
+        showError('Please enter valid 5-digit US zip codes for both locations.');
+        return;
+      }
+      if (zipA === zipB) {
+        showError('Please enter two different zip codes.');
+        return;
+      }
+
+      document.getElementById('errorMsg').textContent = '';
+      document.getElementById('spinner').classList.add('active');
+      document.getElementById('results').classList.remove('visible');
+      document.getElementById('distanceBanner').classList.remove('visible');
+      document.getElementById('mapWrap').classList.remove('visible');
+
+      try {
+        const [geoA, geoB] = await Promise.all([fetchGeo(zipA), fetchGeo(zipB)]);
+        const [wxA, wxB] = await Promise.all([
+          fetchWeather(geoA.lat, geoA.lon),
+          fetchWeather(geoB.lat, geoB.lon),
+        ]);
+
+        fillCard('A', geoA, wxA, zipA);
+        fillCard('B', geoB, wxB, zipB);
+
+        const [miles, km] = haversine(geoA.lat, geoA.lon, geoB.lat, geoB.lon);
+        const milesStr = miles.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' mi';
+        const kmStr    = km.toLocaleString('en-US',    { maximumFractionDigits: 1 }) + ' km';
+
+        document.getElementById('distMiles').textContent = milesStr;
+        document.getElementById('distKm').textContent    = kmStr;
+        document.getElementById('distanceBanner').classList.add('visible');
+        document.getElementById('results').classList.add('visible');
+
+        document.getElementById('mapWrap').classList.add('visible');
+        renderMap(
+          geoA, geoB,
+          `${geoA.city}, ${geoA.state} (${zipA})`,
+          `${geoB.city}, ${geoB.state} (${zipB})`,
+          miles.toLocaleString('en-US', { maximumFractionDigits: 1 })
+        );
+      } catch (err) {
+        showError(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        document.getElementById('spinner').classList.remove('active');
+      }
+    }
+
+    document.getElementById('compareBtn').addEventListener('click', compare);
+    document.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') compare(); });
+    });
+  </script>
+</body>
+</html>
