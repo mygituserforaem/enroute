@@ -288,6 +288,105 @@
       border-radius: 2px;
     }
 
+    /* ── Directions panel ── */
+    .directions-wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 24px;
+      display: none;
+    }
+    .directions-wrap.visible { display: block; }
+
+    .directions-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-radius: 16px 16px 0 0;
+      padding: 16px 24px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.08);
+    }
+    .directions-header:hover { background: #f5f9ff; }
+    .directions-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .directions-header-left span {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a3a5c;
+    }
+    .directions-header-left small {
+      font-size: 0.8rem;
+      color: #7799bb;
+      font-weight: 400;
+    }
+    .directions-toggle {
+      font-size: 1.1rem;
+      color: #7799bb;
+      transition: transform 0.2s;
+    }
+    .directions-toggle.open { transform: rotate(180deg); }
+
+    .directions-list {
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      display: none;
+    }
+    .directions-list.open { display: block; }
+
+    .dir-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 13px 24px;
+      border-bottom: 1px solid #eef5fb;
+      transition: background 0.15s;
+    }
+    .dir-step:last-child { border-bottom: none; }
+    .dir-step:hover { background: #f8fbff; }
+
+    .dir-step.depart { background: #f0f7ff; }
+    .dir-step.arrive { background: #f0fff4; }
+
+    .dir-icon {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: #e8f3ff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .dir-step.depart .dir-icon { background: #fff0f0; }
+    .dir-step.arrive .dir-icon { background: #e8f5ee; }
+
+    .dir-content { flex: 1; min-width: 0; }
+    .dir-instruction {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #1a3a5c;
+      line-height: 1.4;
+    }
+    .dir-road {
+      font-size: 0.78rem;
+      color: #7799bb;
+      margin-top: 2px;
+    }
+    .dir-meta {
+      flex-shrink: 0;
+      text-align: right;
+      font-size: 0.78rem;
+      color: #7799bb;
+      white-space: nowrap;
+    }
+
     /* Pulsing marker */
     .pulse-marker { position: relative; width: 18px; height: 18px; }
     .pulse-dot {
@@ -443,6 +542,18 @@
     </div>
   </div>
 
+  <!-- Step-by-step directions -->
+  <div class="directions-wrap" id="directionsWrap">
+    <div class="directions-header" id="directionsHeader">
+      <div class="directions-header-left">
+        <span>Step-by-Step Directions</span>
+        <small id="stepCount"></small>
+      </div>
+      <div class="directions-toggle" id="directionsToggle">▼</div>
+    </div>
+    <div class="directions-list" id="directionsList"></div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const WMO_CODES = {
@@ -540,7 +651,7 @@
     async function fetchRoute(geoA, geoB) {
       const url = `https://router.project-osrm.org/route/v1/driving/` +
         `${geoA.lon},${geoA.lat};${geoB.lon},${geoB.lat}` +
-        `?overview=full&geometries=geojson`;
+        `?overview=full&geometries=geojson&steps=true`;
       const res = await fetch(url);
       if (!res.ok) return null;
       const data = await res.json();
@@ -548,8 +659,9 @@
       const route = data.routes[0];
       return {
         coords: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
-        distanceM: route.distance,   // metres
-        durationS: route.duration,   // seconds
+        distanceM: route.distance,
+        durationS: route.duration,
+        steps: route.legs.flatMap(leg => leg.steps),
       };
     }
 
@@ -558,6 +670,89 @@
       const m = Math.round((seconds % 3600) / 60);
       if (h === 0) return [`${m} min`, ''];
       return [`${h} hr ${m} min`, ''];
+    }
+
+    function formatDist(metres) {
+      const mi = metres / 1609.34;
+      if (mi < 0.1) return `${Math.round(metres)} ft`.replace(/\d+/, n =>
+        Math.round(metres * 3.281));
+      return mi.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' mi';
+    }
+
+    // Map maneuver type+modifier → emoji icon + human text
+    function maneuverInfo(type, modifier) {
+      const mod = modifier || '';
+      const map = {
+        'depart':              { icon: '🚦', text: 'Depart' },
+        'arrive':              { icon: '📍', text: 'Arrive at destination' },
+        'turn-left':           { icon: '⬅️',  text: 'Turn left' },
+        'turn-right':          { icon: '➡️',  text: 'Turn right' },
+        'turn-slight left':    { icon: '↖️',  text: 'Turn slight left' },
+        'turn-slight right':   { icon: '↗️',  text: 'Turn slight right' },
+        'turn-sharp left':     { icon: '⬅️',  text: 'Turn sharp left' },
+        'turn-sharp right':    { icon: '➡️',  text: 'Turn sharp right' },
+        'turn-uturn':          { icon: '🔄',  text: 'Make a U-turn' },
+        'continue-straight':   { icon: '⬆️',  text: 'Continue straight' },
+        'merge-left':          { icon: '↙️',  text: 'Merge left' },
+        'merge-right':         { icon: '↘️',  text: 'Merge right' },
+        'merge-straight':      { icon: '⬆️',  text: 'Merge' },
+        'ramp-left':           { icon: '↙️',  text: 'Take the ramp on the left' },
+        'ramp-right':          { icon: '↘️',  text: 'Take the ramp on the right' },
+        'fork-left':           { icon: '↙️',  text: 'Keep left at the fork' },
+        'fork-right':          { icon: '↘️',  text: 'Keep right at the fork' },
+        'fork-slight left':    { icon: '↙️',  text: 'Keep left' },
+        'fork-slight right':   { icon: '↘️',  text: 'Keep right' },
+        'roundabout-left':     { icon: '🔁',  text: 'At the roundabout, exit left' },
+        'roundabout-right':    { icon: '🔁',  text: 'At the roundabout, exit right' },
+        'rotary-left':         { icon: '🔁',  text: 'At the rotary, exit left' },
+        'rotary-right':        { icon: '🔁',  text: 'At the rotary, exit right' },
+        'exit roundabout-left':  { icon: '🔁', text: 'Exit the roundabout left' },
+        'exit roundabout-right': { icon: '🔁', text: 'Exit the roundabout right' },
+      };
+      const key = mod ? `${type}-${mod}` : type;
+      return map[key] || map[`${type}-straight`] || { icon: '➡️', text: `${type}` };
+    }
+
+    function buildDirections(steps, labelA, labelB) {
+      const list = document.getElementById('directionsList');
+      list.innerHTML = '';
+      // Filter out the trailing empty arrive-step OSRM sometimes appends
+      const filtered = steps.filter(s => s.distance > 0 || s.maneuver.type === 'arrive');
+      document.getElementById('stepCount').textContent =
+        `${filtered.length} step${filtered.length !== 1 ? 's' : ''}`;
+
+      filtered.forEach((step, i) => {
+        const { type, modifier } = step.maneuver;
+        const info = maneuverInfo(type, modifier);
+        const isDepart = type === 'depart';
+        const isArrive = type === 'arrive';
+
+        // Build instruction text
+        let instruction = info.text;
+        if (step.name && !isArrive) instruction += ` onto <strong>${step.name}</strong>`;
+        if (isDepart) instruction = `Start at <strong>${labelA}</strong>`;
+        if (isArrive) instruction = `Arrive at <strong>${labelB}</strong>`;
+        if (step.ref && !isDepart && !isArrive)
+          instruction += ` <span style="background:#e8f3ff;color:#2e86de;padding:1px 6px;border-radius:4px;font-size:0.72rem;font-weight:600">${step.ref}</span>`;
+
+        const [durStr] = formatDuration(step.duration);
+
+        const el = document.createElement('div');
+        el.className = `dir-step${isDepart ? ' depart' : ''}${isArrive ? ' arrive' : ''}`;
+        el.innerHTML = `
+          <div class="dir-icon">${info.icon}</div>
+          <div class="dir-content">
+            <div class="dir-instruction">${instruction}</div>
+            ${step.name && !isDepart && !isArrive
+              ? `<div class="dir-road">on ${step.name}</div>` : ''}
+          </div>
+          <div class="dir-meta">
+            ${step.distance > 0 ? `<div>${formatDist(step.distance)}</div>` : ''}
+            ${step.duration > 30 ? `<div>${durStr}</div>` : ''}
+          </div>
+        `;
+        list.appendChild(el);
+      });
     }
 
     // ── Map ──
@@ -625,6 +820,7 @@
       document.getElementById('results').classList.remove('visible');
       document.getElementById('distanceBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('directionsWrap').classList.remove('visible');
     }
 
     async function compare() {
@@ -645,6 +841,7 @@
       document.getElementById('results').classList.remove('visible');
       document.getElementById('distanceBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('directionsWrap').classList.remove('visible');
 
       try {
         const [geoA, geoB] = await Promise.all([fetchGeo(zipA), fetchGeo(zipB)]);
@@ -685,13 +882,19 @@
         document.getElementById('results').classList.add('visible');
         document.getElementById('mapWrap').classList.add('visible');
 
-        renderMap(
-          geoA, geoB,
-          `${geoA.city}, ${geoA.state} (${zipA})`,
-          `${geoB.city}, ${geoB.state} (${zipB})`,
-          miles.toLocaleString('en-US', { maximumFractionDigits: 1 }),
-          routeData
-        );
+        const labelA = `${geoA.city}, ${geoA.state} (${zipA})`;
+        const labelB = `${geoB.city}, ${geoB.state} (${zipB})`;
+
+        renderMap(geoA, geoB, labelA, labelB,
+          miles.toLocaleString('en-US', { maximumFractionDigits: 1 }), routeData);
+
+        if (routeData?.steps?.length) {
+          buildDirections(routeData.steps, labelA, labelB);
+          document.getElementById('directionsWrap').classList.add('visible');
+          // Auto-open the list
+          document.getElementById('directionsList').classList.add('open');
+          document.getElementById('directionsToggle').classList.add('open');
+        }
       } catch (err) {
         showError(err.message || 'Something went wrong. Please try again.');
       } finally {
@@ -702,6 +905,14 @@
     document.getElementById('compareBtn').addEventListener('click', compare);
     document.querySelectorAll('input').forEach(inp => {
       inp.addEventListener('keydown', e => { if (e.key === 'Enter') compare(); });
+    });
+
+    // Toggle directions panel
+    document.getElementById('directionsHeader').addEventListener('click', () => {
+      const list   = document.getElementById('directionsList');
+      const toggle = document.getElementById('directionsToggle');
+      list.classList.toggle('open');
+      toggle.classList.toggle('open');
     });
   </script>
 </body>
