@@ -648,7 +648,7 @@
           <th>City / Town</th>
           <th>State</th>
           <th>From Start</th>
-          <th>Temperature</th>
+          <th>Temp at Arrival</th>
           <th>Advisories</th>
         </tr>
       </thead>
@@ -897,17 +897,29 @@
     }
 
     // ── En-route cities temperature table ──
-    async function fetchWeatherSimple(lat, lon) {
+    // Fetches the hourly forecast and picks the hour closest to etaDate (UTC comparison)
+    async function fetchWeatherAtTime(lat, lon, etaDate) {
       const params = new URLSearchParams({
         latitude: lat, longitude: lon,
-        current: 'temperature_2m,weather_code',
+        hourly: 'temperature_2m,weather_code',
         temperature_unit: 'fahrenheit',
-        timezone: 'auto',
+        timezone: 'UTC',
+        forecast_days: 3,
       });
       try {
         const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
         if (!res.ok) return null;
-        return (await res.json()).current;
+        const data = await res.json();
+        const times = data.hourly.time;
+        const temps = data.hourly.temperature_2m;
+        const codes = data.hourly.weather_code;
+        const etaMs = etaDate.getTime();
+        let bestIdx = 0, bestDiff = Infinity;
+        for (let i = 0; i < times.length; i++) {
+          const diff = Math.abs(new Date(times[i] + 'Z').getTime() - etaMs);
+          if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+        }
+        return { temperature_2m: temps[bestIdx], weather_code: codes[bestIdx] };
       } catch { return null; }
     }
 
@@ -1017,10 +1029,18 @@
           await new Promise(r => setTimeout(r, 1100)); // respect rate limit
         }
 
-        // Fetch weather + alerts for all points in parallel
+        // Calculate ETA for each sample point (linear interpolation of route duration)
+        const now = new Date();
+        const totalDurationS = routeData.durationS;
+        samplePoints.forEach(pt => {
+          const fraction = totalMiles > 0 ? pt.distMiles / totalMiles : 0;
+          pt.eta = new Date(now.getTime() + fraction * totalDurationS * 1000);
+        });
+
+        // Fetch hourly forecast at ETA + alerts for all points in parallel
         loading.textContent = 'fetching weather & advisories…';
         const [wxAll, alertsAll] = await Promise.all([
-          Promise.all(samplePoints.map(pt => fetchWeatherSimple(pt.lat, pt.lon))),
+          Promise.all(samplePoints.map(pt => fetchWeatherAtTime(pt.lat, pt.lon, pt.eta))),
           Promise.all(samplePoints.map(pt => fetchAlerts(pt.lat, pt.lon))),
         ]);
 
@@ -1041,8 +1061,10 @@
         rows.forEach(({ pt, wx, alerts, isStart, isEnd }, idx) => {
           const info  = wmo(wx?.weather_code ?? 0);
           const tempF = wx ? Math.round(wx.temperature_2m) : null;
+          const etaStr = fmtTime(pt.eta);
           const tempStr = tempF != null
-            ? `<span class="${tempColorClass(tempF)}">${info.icon} ${tempF}°F</span>`
+            ? `<span class="${tempColorClass(tempF)}">${info.icon} ${tempF}°F</span>
+               <div style="font-size:0.72rem;color:#7799bb;margin-top:2px">at ${etaStr}</div>`
             : '—';
           const distStr = pt.distMiles < 1
             ? (isStart ? '—' : `${Math.round(pt.distMiles * 5280)} ft`)
