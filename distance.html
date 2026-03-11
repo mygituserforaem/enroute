@@ -406,6 +406,75 @@
       100% { transform: scale(2.2); opacity: 0; }
     }
 
+    /* ── En-route cities table ── */
+    .enroute-wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 24px;
+      display: none;
+    }
+    .enroute-wrap.visible { display: block; }
+
+    .enroute-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-radius: 16px 16px 0 0;
+      padding: 16px 24px;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.08);
+    }
+    .enroute-header span {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a3a5c;
+    }
+    .enroute-loading {
+      font-size: 0.8rem;
+      color: #7799bb;
+      font-weight: 400;
+    }
+
+    .enroute-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(46,134,222,0.08);
+    }
+    .enroute-table thead th {
+      background: #f0f7ff;
+      padding: 10px 16px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #5577aa;
+      text-align: left;
+      border-bottom: 1px solid #d0e8f8;
+    }
+    .enroute-table tbody tr { border-bottom: 1px solid #eef5fb; transition: background 0.15s; }
+    .enroute-table tbody tr:last-child { border-bottom: none; }
+    .enroute-table tbody tr:hover { background: #f8fbff; }
+    .enroute-table tbody tr.row-start { background: #fff5f5; }
+    .enroute-table tbody tr.row-end   { background: #f0fff4; }
+    .enroute-table tbody td {
+      padding: 11px 16px;
+      font-size: 0.9rem;
+      color: #1a3a5c;
+    }
+    .enroute-table tbody td:first-child { font-weight: 600; color: #5577aa; width: 80px; }
+    .enroute-table tbody td:nth-child(2) { font-weight: 600; }
+    .enroute-table tbody td:last-child { font-weight: 600; }
+    .temp-cold  { color: #2e86de; }
+    .temp-cool  { color: #00b894; }
+    .temp-warm  { color: #e17055; }
+    .temp-hot   { color: #d63031; }
+
     @media (max-width: 860px) {
       .results.visible { grid-template-columns: 1fr; }
       .search-row { flex-wrap: wrap; }
@@ -540,6 +609,26 @@
         Location B
       </div>
     </div>
+  </div>
+
+  <!-- En-route cities temperature table -->
+  <div class="enroute-wrap" id="enrouteWrap">
+    <div class="enroute-header">
+      <span>🌡️ Cities Along the Route</span>
+      <span class="enroute-loading" id="enrouteLoading"></span>
+    </div>
+    <table class="enroute-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>City / Town</th>
+          <th>State</th>
+          <th>From Start</th>
+          <th>Temperature</th>
+        </tr>
+      </thead>
+      <tbody id="enrouteBody"></tbody>
+    </table>
   </div>
 
   <!-- Step-by-step directions -->
@@ -764,6 +853,140 @@
       });
     }
 
+    // ── En-route cities temperature table ──
+    async function fetchWeatherSimple(lat, lon) {
+      const params = new URLSearchParams({
+        latitude: lat, longitude: lon,
+        current: 'temperature_2m,weather_code',
+        temperature_unit: 'fahrenheit',
+        timezone: 'auto',
+      });
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+        if (!res.ok) return null;
+        return (await res.json()).current;
+      } catch { return null; }
+    }
+
+    function tempColorClass(f) {
+      if (f < 32) return 'temp-cold';
+      if (f < 55) return 'temp-cool';
+      if (f < 85) return 'temp-warm';
+      return 'temp-hot';
+    }
+
+    async function buildRouteCitiesTable(routeData, geoA, geoB) {
+      const wrap    = document.getElementById('enrouteWrap');
+      const loading = document.getElementById('enrouteLoading');
+      const tbody   = document.getElementById('enrouteBody');
+
+      wrap.classList.add('visible');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7799bb;padding:16px">Locating cities along the route…</td></tr>';
+      loading.textContent = 'loading…';
+
+      try {
+        const coords = routeData.coords; // [[lat,lon], …]
+
+        // Cumulative haversine distances (miles) per coordinate
+        const cumDist = [0];
+        for (let i = 1; i < coords.length; i++) {
+          const [d] = haversine(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]);
+          cumDist.push(cumDist[i-1] + d);
+        }
+        const totalMiles = cumDist[cumDist.length - 1];
+
+        // Scale intermediate sample count to route length (~1 per 80 mi, max 9)
+        const nMid = Math.min(9, Math.max(0, Math.floor(totalMiles / 80)));
+
+        // Build list: start + evenly-spaced intermediates + end
+        const samplePoints = [];
+
+        samplePoints.push({ lat: geoA.lat, lon: geoA.lon, distMiles: 0,
+                             city: geoA.city, state: geoA.state, fixed: true });
+
+        for (let i = 1; i <= nMid; i++) {
+          const target = (totalMiles / (nMid + 1)) * i;
+          let bestIdx = 0, bestDiff = Infinity;
+          for (let j = 0; j < cumDist.length; j++) {
+            const diff = Math.abs(cumDist[j] - target);
+            if (diff < bestDiff) { bestDiff = diff; bestIdx = j; }
+          }
+          samplePoints.push({ lat: coords[bestIdx][0], lon: coords[bestIdx][1],
+                               distMiles: cumDist[bestIdx], fixed: false });
+        }
+
+        samplePoints.push({ lat: geoB.lat, lon: geoB.lon, distMiles: totalMiles,
+                             city: geoB.city, state: geoB.state, fixed: true });
+
+        // Reverse-geocode intermediate points (sequential — Nominatim 1 req/s limit)
+        for (let i = 0; i < samplePoints.length; i++) {
+          const pt = samplePoints[i];
+          if (pt.fixed) continue;
+          loading.textContent = `geocoding ${i} of ${samplePoints.length - 2} waypoints…`;
+          try {
+            const res  = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${pt.lat}&lon=${pt.lon}&format=json`,
+              { headers: { 'Accept-Language': 'en' } }
+            );
+            const data = await res.json();
+            const addr = data.address || {};
+            pt.city  = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+            pt.state = addr.state || '';
+          } catch {
+            pt.city  = '—';
+            pt.state = '—';
+          }
+          await new Promise(r => setTimeout(r, 1100)); // respect rate limit
+        }
+
+        // Fetch weather for all points in parallel
+        loading.textContent = 'fetching weather…';
+        const wxAll = await Promise.all(samplePoints.map(pt => fetchWeatherSimple(pt.lat, pt.lon)));
+
+        // Deduplicate consecutive same-city rows (keep first occurrence)
+        const seen = new Set();
+        const rows = [];
+        for (let i = 0; i < samplePoints.length; i++) {
+          const pt = samplePoints[i];
+          const key = `${pt.city}|${pt.state}`;
+          // Always keep start and end; skip duplicate intermediates
+          if (!pt.fixed && seen.has(key) && pt.city) continue;
+          seen.add(key);
+          rows.push({ pt, wx: wxAll[i], isStart: i === 0, isEnd: i === samplePoints.length - 1 });
+        }
+
+        // Render
+        tbody.innerHTML = '';
+        rows.forEach(({ pt, wx, isStart, isEnd }, idx) => {
+          const info = wmo(wx?.weather_code ?? 0);
+          const tempF = wx ? Math.round(wx.temperature_2m) : null;
+          const tempStr = tempF != null
+            ? `<span class="${tempColorClass(tempF)}">${info.icon} ${tempF}°F</span>`
+            : '—';
+          const distStr = pt.distMiles < 1
+            ? (isStart ? '—' : `${Math.round(pt.distMiles * 5280)} ft`)
+            : `${Math.round(pt.distMiles).toLocaleString('en-US')} mi`;
+
+          const tr = document.createElement('tr');
+          if (isStart) tr.className = 'row-start';
+          if (isEnd)   tr.className = 'row-end';
+          tr.innerHTML = `
+            <td>${isStart ? '🚦 Start' : isEnd ? '📍 End' : idx}</td>
+            <td>${pt.city || '—'}</td>
+            <td>${pt.state || '—'}</td>
+            <td>${distStr}</td>
+            <td>${tempStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        loading.textContent = `${rows.length} stops`;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#d63031;text-align:center;padding:16px">${err.message}</td></tr>`;
+        loading.textContent = '';
+      }
+    }
+
     // ── Map ──
     let map = null;
     let layerGroup = null;
@@ -829,6 +1052,7 @@
       document.getElementById('results').classList.remove('visible');
       document.getElementById('distanceBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('enrouteWrap').classList.remove('visible');
       document.getElementById('directionsWrap').classList.remove('visible');
     }
 
@@ -846,6 +1070,7 @@
       document.getElementById('results').classList.remove('visible');
       document.getElementById('distanceBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('enrouteWrap').classList.remove('visible');
       document.getElementById('directionsWrap').classList.remove('visible');
 
       try {
@@ -904,6 +1129,11 @@
           // Auto-open the list
           document.getElementById('directionsList').classList.add('open');
           document.getElementById('directionsToggle').classList.add('open');
+        }
+
+        // En-route cities table (fires async after main UI is shown)
+        if (routeData) {
+          buildRouteCitiesTable(routeData, geoA, geoB);
         }
       } catch (err) {
         showError(err.message || 'Something went wrong. Please try again.');
