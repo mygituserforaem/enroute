@@ -328,12 +328,12 @@
   <div class="search-row">
     <div class="zip-group">
       <label>From</label>
-      <input type="text" id="addrA" placeholder="e.g. Chicago, IL" autocomplete="off" />
+      <input type="text" id="addrA" value="Chicago, IL" autocomplete="on" />
     </div>
     <div class="vs-badge">→</div>
     <div class="zip-group">
       <label>To</label>
-      <input type="text" id="addrB" placeholder="e.g. Milwaukee, WI" autocomplete="off" />
+      <input type="text" id="addrB" value="Milwaukee, WI" autocomplete="on" />
     </div>
     <button class="search-btn" id="searchBtn">Find</button>
   </div>
@@ -351,13 +351,14 @@
       <option value="sandwich">Sandwich</option>
       <option value="coffee_shop">Coffee</option>
       <option value="fast_food">Fast Food</option>
+      <option value="indian">Indian</option>
     </select>
     <label>Max detour radius:</label>
     <select id="radiusFilter">
-      <option value="500">500 m</option>
-      <option value="1000" selected>1 km</option>
-      <option value="2000">2 km</option>
-      <option value="5000">5 km</option>
+      <option value="805">0.5 mi</option>
+      <option value="1609" selected>1 mi</option>
+      <option value="3219">2 mi</option>
+      <option value="8047">5 mi</option>
     </select>
   </div>
 
