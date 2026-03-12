@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurants En Route</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #e0f0ff 0%, #c8e4fb 50%, #dceffe 100%);
+      color: #1a2a3a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    nav {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    nav a {
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: #2e86de;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      box-shadow: 0 2px 6px rgba(46,134,222,0.1);
+      transition: background 0.2s;
+    }
+    nav a:hover { background: #e8f3ff; }
+    nav a.active { background: #2e86de; color: #fff; border-color: #2e86de; }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      color: #1a3a5c;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: #5577aa;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 12px;
+      align-items: flex-end;
+    }
+    .zip-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .zip-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #5577aa;
+    }
+    .zip-group input {
+      padding: 13px 16px;
+      border: 2px solid #90bde0;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #1a2a3a;
+      font-size: 1.05rem;
+      outline: none;
+      transition: border-color 0.2s;
+      box-shadow: 0 2px 8px rgba(100,160,220,0.15);
+    }
+    .zip-group input::placeholder { color: #99aabb; }
+    .zip-group input:focus { border-color: #2e86de; }
+
+    .vs-badge {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #7799bb;
+      padding-bottom: 13px;
+    }
+
+    .search-btn {
+      padding: 13px 24px;
+      border: none;
+      border-radius: 12px;
+      background: #2e86de;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.3);
+      white-space: nowrap;
+    }
+    .search-btn:hover { background: #1a6fc4; }
+    .search-btn:active { transform: scale(0.97); }
+
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .filter-row label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #5577aa;
+    }
+    .filter-row select {
+      padding: 8px 12px;
+      border: 2px solid #90bde0;
+      border-radius: 10px;
+      background: #fff;
+      color: #1a2a3a;
+      font-size: 0.9rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-row select:focus { border-color: #2e86de; }
+
+    .error {
+      color: #d63031;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #c8dff5;
+      border-top-color: #2e86de;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+      margin: 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner.active { display: block; }
+
+    /* ── Summary banner ── */
+    .summary-banner {
+      width: 100%;
+      max-width: 1100px;
+      background: #2e86de;
+      border-radius: 16px;
+      padding: 18px 28px;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(46,134,222,0.25);
+    }
+    .summary-banner.visible { display: flex; }
+    .summary-banner .stat { text-align: center; }
+    .summary-banner .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 4px;
+    }
+    .summary-banner .value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .summary-banner .sub-value {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.65);
+      margin-top: 2px;
+    }
+    .summary-banner .sep {
+      width: 1px; height: 48px;
+      background: rgba(255,255,255,0.25);
+    }
+
+    /* ── Map ── */
+    .map-wrap {
+      width: 100%;
+      max-width: 1100px;
+      margin-bottom: 24px;
+      display: none;
+    }
+    .map-wrap.visible { display: block; }
+    .map-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7799bb;
+      margin-bottom: 10px;
+    }
+    #map {
+      width: 100%;
+      height: 420px;
+      border-radius: 16px;
+      border: 1px solid #c8dff5;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(46,134,222,0.12);
+    }
+
+    /* ── Restaurant table ── */
+    .rest-wrap {
+      width: 100%;
+      max-width: 1100px;
+      display: none;
+    }
+    .rest-wrap.visible { display: block; }
+
+    .rest-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-radius: 16px 16px 0 0;
+      padding: 16px 24px;
+      box-shadow: 0 2px 8px rgba(46,134,222,0.08);
+    }
+    .rest-header span { font-size: 1rem; font-weight: 700; color: #1a3a5c; }
+    .rest-loading { font-size: 0.8rem; color: #7799bb; font-weight: 400; }
+
+    .rest-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border: 1px solid #c8dff5;
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(46,134,222,0.08);
+    }
+    .rest-table thead th {
+      background: #f0f7ff;
+      padding: 10px 16px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #5577aa;
+      text-align: left;
+      border-bottom: 1px solid #d0e8f8;
+    }
+    .rest-table tbody tr { border-bottom: 1px solid #eef5fb; transition: background 0.15s; }
+    .rest-table tbody tr:last-child { border-bottom: none; }
+    .rest-table tbody tr:hover { background: #f8fbff; }
+    .rest-table tbody td { padding: 12px 16px; font-size: 0.9rem; color: #1a3a5c; vertical-align: middle; }
+
+    .cuisine-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #e8f3ff;
+      color: #2e6db4;
+      border: 1px solid #c8dff5;
+    }
+
+    .open-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .open-yes  { background: #d5ffe8; color: #00854d; border: 1px solid #80d8a8; }
+    .open-no   { background: #ffd5d5; color: #c0392b; border: 1px solid #e08080; }
+    .open-unknown { background: #f0f0f0; color: #7799bb; border: 1px solid #ccddef; }
+
+    .map-pin-link {
+      color: #2e86de;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .map-pin-link:hover { text-decoration: underline; }
+
+    @media (max-width: 860px) {
+      .search-row { flex-wrap: wrap; }
+      .vs-badge { display: none; }
+      .rest-table thead th:nth-child(5),
+      .rest-table tbody td:nth-child(5) { display: none; }
+    }
+    @media (max-width: 480px) {
+      #map { height: 280px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html">Enroute Weather</a>
+    <a href="restaurants.html" class="active">Restaurants</a>
+  </nav>
+
+  <h1>Restaurants En Route</h1>
+  <p class="subtitle">Find places to eat along your route between any two US locations</p>
+
+  <div class="search-row">
+    <div class="zip-group">
+      <label>From</label>
+      <input type="text" id="addrA" placeholder="e.g. Chicago, IL" autocomplete="off" />
+    </div>
+    <div class="vs-badge">→</div>
+    <div class="zip-group">
+      <label>To</label>
+      <input type="text" id="addrB" placeholder="e.g. Milwaukee, WI" autocomplete="off" />
+    </div>
+    <button class="search-btn" id="searchBtn">Find</button>
+  </div>
+
+  <div class="filter-row">
+    <label>Cuisine:</label>
+    <select id="cuisineFilter">
+      <option value="">All</option>
+      <option value="american">American</option>
+      <option value="pizza">Pizza</option>
+      <option value="burger">Burger</option>
+      <option value="mexican">Mexican</option>
+      <option value="chinese">Chinese</option>
+      <option value="italian">Italian</option>
+      <option value="sandwich">Sandwich</option>
+      <option value="coffee_shop">Coffee</option>
+      <option value="fast_food">Fast Food</option>
+    </select>
+    <label>Max detour radius:</label>
+    <select id="radiusFilter">
+      <option value="500">500 m</option>
+      <option value="1000" selected>1 km</option>
+      <option value="2000">2 km</option>
+      <option value="5000">5 km</option>
+    </select>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+  <div class="spinner" id="spinner"></div>
+
+  <div class="summary-banner" id="summaryBanner">
+    <div class="stat">
+      <div class="label">Route Distance</div>
+      <div class="value" id="routeDist">--</div>
+      <div class="sub-value" id="routeDistKm">--</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat">
+      <div class="label">Drive Time</div>
+      <div class="value" id="routeTime">--</div>
+      <div class="sub-value">estimated</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat">
+      <div class="label">Restaurants Found</div>
+      <div class="value" id="restCount">--</div>
+      <div class="sub-value">along the route</div>
+    </div>
+  </div>
+
+  <div class="map-wrap" id="mapWrap">
+    <div class="map-label">Route Map</div>
+    <div id="map"></div>
+  </div>
+
+  <div class="rest-wrap" id="restWrap">
+    <div class="rest-header">
+      <span>🍽️ Restaurants Along the Route</span>
+      <span class="rest-loading" id="restLoading"></span>
+    </div>
+    <table class="rest-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Cuisine</th>
+          <th>From Start</th>
+          <th>Open Now</th>
+          <th>Map</th>
+        </tr>
+      </thead>
+      <tbody id="restBody"></tbody>
+    </table>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 3958.8;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      const miles = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return [miles, miles * 1.60934];
+    }
+
+    function fmtDuration(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.round((seconds % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    async function fetchGeo(address) {
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        new URLSearchParams({ q: address, countrycodes: 'us', format: 'json', limit: 1, addressdetails: 1 });
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      if (!res.ok) throw new Error(`Could not geocode: "${address}"`);
+      const data = await res.json();
+      if (!data.length) throw new Error(`Address not found: "${address}". Try adding a city or state.`);
+      const place = data[0];
+      return {
+        lat:     parseFloat(place.lat),
+        lon:     parseFloat(place.lon),
+        display: place.display_name.split(',').slice(0, 3).join(','),
+      };
+    }
+
+    async function fetchRoute(geoA, geoB) {
+      const url = `https://router.project-osrm.org/route/v1/driving/` +
+        `${geoA.lon},${geoA.lat};${geoB.lon},${geoB.lat}` +
+        `?overview=full&geometries=geojson`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Could not fetch route.');
+      const data = await res.json();
+      if (data.code !== 'Ok' || !data.routes?.length) throw new Error('No driving route found.');
+      const route = data.routes[0];
+      return {
+        coords:    route.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+        distanceM: route.distance,
+        durationS: route.duration,
+      };
+    }
+
+    // Sample evenly-spaced points along the route polyline
+    function sampleRoutePoints(coords, radiusM) {
+      // Sample every ~radiusM meters worth of points
+      const stepMiles = (radiusM * 2) / 1609.34;
+      const points = [];
+      let cumDist = 0;
+      let lastSample = 0;
+      points.push({ lat: coords[0][0], lon: coords[0][1], distMiles: 0 });
+      for (let i = 1; i < coords.length; i++) {
+        const [d] = haversine(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]);
+        cumDist += d;
+        if (cumDist - lastSample >= stepMiles) {
+          points.push({ lat: coords[i][0], lon: coords[i][1], distMiles: cumDist });
+          lastSample = cumDist;
+        }
+      }
+      const last = coords[coords.length - 1];
+      points.push({ lat: last[0], lon: last[1], distMiles: cumDist });
+      return points;
+    }
+
+    async function fetchRestaurantsNear(lat, lon, radiusM, cuisine) {
+      const cuisineFilter = cuisine
+        ? `["cuisine"~"${cuisine}",i]`
+        : '';
+      const query = `
+        [out:json][timeout:25];
+        node["amenity"="restaurant"]${cuisineFilter}(around:${radiusM},${lat},${lon});
+        out body;
+      `;
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(query),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.elements || [];
+    }
+
+    // Deduplicate by OSM node id
+    function mergeRestaurants(existing, newItems) {
+      const ids = new Set(existing.map(r => r.id));
+      for (const item of newItems) {
+        if (!ids.has(item.id)) {
+          ids.add(item.id);
+          existing.push(item);
+        }
+      }
+      return existing;
+    }
+
+    // Compute distance from start point to a restaurant (closest route point)
+    function distFromStart(restLat, restLon, routeCoords) {
+      let minDist = Infinity, minIdx = 0;
+      for (let i = 0; i < routeCoords.length; i++) {
+        const [d] = haversine(restLat, restLon, routeCoords[i][0], routeCoords[i][1]);
+        if (d < minDist) { minDist = d; minIdx = i; }
+      }
+      // Cumulative distance to that index
+      let cum = 0;
+      for (let i = 1; i <= minIdx; i++) {
+        const [d] = haversine(routeCoords[i-1][0], routeCoords[i-1][1], routeCoords[i][0], routeCoords[i][1]);
+        cum += d;
+      }
+      return cum;
+    }
+
+    function isOpenNow(tags) {
+      if (!tags.opening_hours) return 'unknown';
+      // Simple heuristic: if "24/7" it's open
+      if (tags.opening_hours === '24/7') return 'yes';
+      return 'unknown';
+    }
+
+    function cuisineLabel(tags) {
+      return tags.cuisine
+        ? tags.cuisine.replace(/_/g, ' ').replace(/;.*/,'').trim()
+        : 'Restaurant';
+    }
+
+    // ── Map ──
+    let map = null;
+    let layerGroup = null;
+    let restLayerGroup = null;
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map', { center: [39.5, -98.35], zoom: 4, scrollWheelZoom: false });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
+      }).addTo(map);
+      layerGroup = L.layerGroup().addTo(map);
+      restLayerGroup = L.layerGroup().addTo(map);
+    }
+
+    function makeIcon(color) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>`,
+        iconSize: [14,14], iconAnchor: [7,7], popupAnchor: [0,-10],
+      });
+    }
+
+    const restIcon = L.divIcon({
+      className: '',
+      html: `<div style="font-size:16px;line-height:1">🍽️</div>`,
+      iconSize: [20,20], iconAnchor: [10,10], popupAnchor: [0,-12],
+    });
+
+    function renderMap(geoA, geoB, routeCoords, restaurants) {
+      initMap();
+      layerGroup.clearLayers();
+      restLayerGroup.clearLayers();
+
+      // Route polyline
+      L.polyline(routeCoords, { color: '#2e86de', weight: 4, opacity: 0.7 }).addTo(layerGroup);
+
+      // Start / end markers
+      L.marker([geoA.lat, geoA.lon], { icon: makeIcon('#ff3d3d') })
+        .bindPopup(`<strong>Start:</strong> ${geoA.display}`).addTo(layerGroup);
+      L.marker([geoB.lat, geoB.lon], { icon: makeIcon('#00b894') })
+        .bindPopup(`<strong>End:</strong> ${geoB.display}`).addTo(layerGroup);
+
+      // Restaurant markers
+      for (const r of restaurants) {
+        const name = r.tags.name || 'Restaurant';
+        const cuisine = cuisineLabel(r.tags);
+        L.marker([r.lat, r.lon], { icon: restIcon })
+          .bindPopup(`<strong>${name}</strong><br>${cuisine}`)
+          .addTo(restLayerGroup);
+      }
+
+      map.fitBounds(
+        [[geoA.lat, geoA.lon], [geoB.lat, geoB.lon]],
+        { padding: [60, 60] }
+      );
+    }
+
+    // ── Main ──
+    function showError(msg) {
+      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('summaryBanner').classList.remove('visible');
+      document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('restWrap').classList.remove('visible');
+    }
+
+    async function search() {
+      const addrA   = document.getElementById('addrA').value.trim();
+      const addrB   = document.getElementById('addrB').value.trim();
+      const cuisine = document.getElementById('cuisineFilter').value;
+      const radiusM = parseInt(document.getElementById('radiusFilter').value, 10);
+
+      if (!addrA || !addrB) { showError('Please enter both a start and end location.'); return; }
+
+      document.getElementById('errorMsg').textContent = '';
+      document.getElementById('spinner').classList.add('active');
+      document.getElementById('summaryBanner').classList.remove('visible');
+      document.getElementById('mapWrap').classList.remove('visible');
+      document.getElementById('restWrap').classList.remove('visible');
+
+      try {
+        const [geoA, geoB] = await Promise.all([fetchGeo(addrA), fetchGeo(addrB)]);
+
+        if (Math.abs(geoA.lat - geoB.lat) < 0.001 && Math.abs(geoA.lon - geoB.lon) < 0.001) {
+          throw new Error('Both addresses resolved to the same location. Please be more specific.');
+        }
+
+        const routeData = await fetchRoute(geoA, geoB);
+        const distMiles = routeData.distanceM / 1609.34;
+        const distKm    = routeData.distanceM / 1000;
+
+        // Summary banner
+        document.getElementById('routeDist').textContent =
+          distMiles.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' mi';
+        document.getElementById('routeDistKm').textContent =
+          distKm.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' km';
+        document.getElementById('routeTime').textContent = fmtDuration(routeData.durationS);
+        document.getElementById('summaryBanner').classList.add('visible');
+
+        // Show map immediately
+        renderMap(geoA, geoB, routeData.coords, []);
+        document.getElementById('mapWrap').classList.add('visible');
+
+        // Show table shell
+        const restBody    = document.getElementById('restBody');
+        const restLoading = document.getElementById('restLoading');
+        const restWrap    = document.getElementById('restWrap');
+        restBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#7799bb;padding:16px">Searching for restaurants along the route…</td></tr>';
+        restLoading.textContent = 'searching…';
+        restWrap.classList.add('visible');
+
+        // Sample points and query Overpass for each
+        const samplePoints = sampleRoutePoints(routeData.coords, radiusM);
+        let allRestaurants = [];
+
+        for (let i = 0; i < samplePoints.length; i++) {
+          restLoading.textContent = `querying point ${i + 1} of ${samplePoints.length}…`;
+          const items = await fetchRestaurantsNear(samplePoints[i].lat, samplePoints[i].lon, radiusM, cuisine);
+          allRestaurants = mergeRestaurants(allRestaurants, items);
+          await new Promise(r => setTimeout(r, 300));
+        }
+
+        // Filter: only keep named restaurants
+        allRestaurants = allRestaurants.filter(r => r.tags && r.tags.name);
+
+        // Sort by distance from start
+        allRestaurants.sort((a, b) =>
+          distFromStart(a.lat, a.lon, routeData.coords) -
+          distFromStart(b.lat, b.lon, routeData.coords)
+        );
+
+        // Re-render map with restaurants
+        renderMap(geoA, geoB, routeData.coords, allRestaurants);
+
+        document.getElementById('restCount').textContent = allRestaurants.length;
+
+        if (!allRestaurants.length) {
+          restBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#7799bb;padding:16px">No restaurants found. Try increasing the detour radius or removing the cuisine filter.</td></tr>';
+          restLoading.textContent = '0 found';
+          return;
+        }
+
+        restBody.innerHTML = '';
+        allRestaurants.forEach((r, idx) => {
+          const name    = r.tags.name || '—';
+          const cuisine = cuisineLabel(r.tags);
+          const distMi  = distFromStart(r.lat, r.lon, routeData.coords);
+          const distStr = distMi < 0.1
+            ? `${Math.round(distMi * 5280)} ft`
+            : `${distMi.toFixed(1)} mi`;
+          const openStatus = isOpenNow(r.tags);
+          const openHTML = openStatus === 'yes'
+            ? '<span class="open-badge open-yes">Open 24/7</span>'
+            : openStatus === 'no'
+            ? '<span class="open-badge open-no">Closed</span>'
+            : '<span class="open-badge open-unknown">Unknown</span>';
+          const mapsUrl = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}&zoom=17`;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td style="font-weight:600">${name}</td>
+            <td><span class="cuisine-badge">${cuisine}</span></td>
+            <td>${distStr} from start</td>
+            <td>${openHTML}</td>
+            <td><a class="map-pin-link" href="${mapsUrl}" target="_blank" rel="noopener">View Map</a></td>
+          `;
+          restBody.appendChild(tr);
+        });
+
+        restLoading.textContent = `${allRestaurants.length} found`;
+
+      } catch (err) {
+        showError(err.message || 'Something went wrong. Please try again.');
+      } finally {
+        document.getElementById('spinner').classList.remove('active');
+      }
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', search);
+    document.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+    });
+  </script>
+</body>
+</html>
