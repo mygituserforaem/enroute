@@ -268,6 +268,19 @@
       border: 1px solid #c8dff5;
     }
 
+    .open-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .open-yes     { background: #d5ffe8; color: #00854d; border: 1px solid #80d8a8; }
+    .open-no      { background: #ffd5d5; color: #c0392b; border: 1px solid #e08080; }
+    .open-unknown { background: #f0f0f0; color: #7799bb; border: 1px solid #ccddef; }
+
+    .hours-text { font-size: 0.78rem; color: #5577aa; margin-top: 3px; }
+
     .map-pin-link {
       color: #2e86de;
       text-decoration: none;
@@ -358,6 +371,8 @@
           <th>Name</th>
           <th>Cuisine</th>
           <th>Distance</th>
+          <th>Status</th>
+          <th>Hours</th>
           <th>Map</th>
         </tr>
       </thead>
@@ -408,6 +423,61 @@
       if (!res.ok) throw new Error('Could not fetch restaurant data.');
       const data = await res.json();
       return (data.elements || []).filter(r => r.tags && r.tags.name);
+    }
+
+    // Parse OSM opening_hours to determine if currently open
+    function isOpenNow(oh) {
+      if (!oh) return 'unknown';
+      if (oh.trim() === '24/7') return 'open';
+
+      const now = new Date();
+      const dayIdx = now.getDay(); // 0=Sun, 1=Mon...
+      const dayNames = ['su','mo','tu','we','th','fr','sa'];
+      const todayKey = dayNames[dayIdx];
+      const curMin = now.getHours() * 60 + now.getMinutes();
+
+      // Normalize and split rules on ";"
+      const rules = oh.toLowerCase().split(';').map(s => s.trim()).filter(Boolean);
+
+      for (const rule of rules) {
+        // Match pattern like: "Mo-Fr 09:00-22:00" or "Sa,Su 10:00-21:00"
+        const m = rule.match(/^([a-z,\-]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+        if (!m) continue;
+
+        const dayPart  = m[1];
+        const openMin  = timeToMin(m[2]);
+        const closeMin = timeToMin(m[3]);
+
+        if (dayMatches(dayPart, todayKey)) {
+          if (curMin >= openMin && curMin < closeMin) return 'open';
+          return 'closed';
+        }
+      }
+      return 'unknown';
+    }
+
+    function timeToMin(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    const DAY_IDX = { mo:0, tu:1, we:2, th:3, fr:4, sa:5, su:6 };
+
+    function dayMatches(dayPart, todayKey) {
+      // Handle comma-separated groups: "mo,we,fr"
+      for (const segment of dayPart.split(',')) {
+        const s = segment.trim();
+        if (s.includes('-')) {
+          const [from, to] = s.split('-');
+          const fi = DAY_IDX[from], ti = DAY_IDX[to], ci = DAY_IDX[todayKey];
+          if (fi !== undefined && ti !== undefined && ci !== undefined) {
+            if (fi <= ti ? (ci >= fi && ci <= ti) : (ci >= fi || ci <= ti)) return true;
+          }
+        } else if (s === todayKey) {
+          return true;
+        }
+      }
+      return false;
     }
 
     function cuisineLabel(tags) {
@@ -523,20 +593,29 @@
         document.getElementById('summaryBanner').classList.add('visible');
 
         if (!restaurants.length) {
-          restBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7799bb;padding:16px">No restaurants found. Try increasing the radius or removing the cuisine filter.</td></tr>';
+          restBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#7799bb;padding:16px">No restaurants found. Try increasing the radius or removing the cuisine filter.</td></tr>';
           restLoading.textContent = '0 found';
           return;
         }
 
         restBody.innerHTML = '';
         restaurants.forEach((r, idx) => {
-          const name    = r.tags.name || '—';
-          const cuisine = cuisineLabel(r.tags);
-          const distMi  = haversine(geo.lat, geo.lon, r.lat, r.lon);
-          const distStr = distMi < 0.1
+          const name      = r.tags.name || '—';
+          const cuisine   = cuisineLabel(r.tags);
+          const distMi    = haversine(geo.lat, geo.lon, r.lat, r.lon);
+          const distStr   = distMi < 0.1
             ? `${Math.round(distMi * 5280)} ft`
             : `${distMi.toFixed(2)} mi`;
-          const mapsUrl = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}&zoom=17`;
+          const openStatus = isOpenNow(r.tags.opening_hours);
+          const openHTML  = openStatus === 'open'
+            ? '<span class="open-badge open-yes">Open</span>'
+            : openStatus === 'closed'
+            ? '<span class="open-badge open-no">Closed</span>'
+            : '<span class="open-badge open-unknown">Unknown</span>';
+          const hoursText = r.tags.opening_hours
+            ? r.tags.opening_hours.replace(/;/g, '<br>')
+            : '<span style="color:#aabbcc">—</span>';
+          const mapsUrl   = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}&zoom=17`;
 
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -544,6 +623,8 @@
             <td style="font-weight:600">${name}</td>
             <td><span class="cuisine-badge">${cuisine}</span></td>
             <td>${distStr}</td>
+            <td>${openHTML}</td>
+            <td class="hours-text">${hoursText}</td>
             <td><a class="map-pin-link" href="${mapsUrl}" target="_blank" rel="noopener">View Map</a></td>
           `;
           restBody.appendChild(tr);
