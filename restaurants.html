@@ -6,456 +6,546 @@
   <title>Nearby Restaurants</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
-      background: linear-gradient(160deg, #dbeeff 0%, #b8d9f8 35%, #cce8ff 65%, #ddf0ff 100%);
+      background: linear-gradient(160deg, #e8f4ff 0%, #d0e8fb 30%, #c8e2ff 65%, #ddf0ff 100%);
       color: #1a2a3a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 36px 16px 60px;
     }
 
+    /* ── Nav ── */
+    .nav-wrap {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      padding: 20px 16px 0;
+    }
     nav {
       width: 100%;
       max-width: 1100px;
       display: flex;
       gap: 8px;
-      margin-bottom: 36px;
-      background: rgba(255,255,255,0.55);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.7);
-      border-radius: 14px;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 16px;
       padding: 8px;
       box-shadow: 0 4px 24px rgba(46,134,222,0.1);
     }
     nav a {
       padding: 9px 20px;
-      border-radius: 9px;
+      border-radius: 10px;
       font-size: 0.88rem;
       font-weight: 600;
       text-decoration: none;
       color: #3a6ea8;
-      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+      transition: all 0.2s;
       letter-spacing: 0.2px;
     }
-    nav a:hover { background: rgba(46,134,222,0.1); color: #1a5fa8; }
+    nav a:hover { background: rgba(46,134,222,0.08); color: #1a5fa8; }
     nav a.active {
       background: linear-gradient(135deg, #2e86de, #1a6fc4);
       color: #fff;
       box-shadow: 0 3px 12px rgba(46,134,222,0.35);
     }
 
+    /* ── Hero ── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 32px;
+    }
+    .hero-icon {
+      font-size: 3.2rem;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 4px 14px rgba(46,134,222,0.3));
+    }
     h1 {
-      font-size: 2.2rem;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, #1a3a5c 0%, #2e86de 100%);
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #1a3a5c 0%, #2e86de 60%, #5ba4f5 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       text-align: center;
+      margin-bottom: 10px;
     }
     .subtitle {
-      font-size: 0.92rem;
+      font-size: 1rem;
       color: #6688aa;
-      margin-bottom: 32px;
       text-align: center;
       font-weight: 500;
+      margin-bottom: 36px;
     }
 
-    .search-row {
-      display: flex;
-      gap: 12px;
+    /* ── Search card ── */
+    .search-card {
       width: 100%;
-      max-width: 720px;
-      margin-bottom: 12px;
-      align-items: flex-end;
-      background: rgba(255,255,255,0.6);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.8);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 4px 24px rgba(46,134,222,0.1);
+      max-width: 620px;
+      background: rgba(255,255,255,0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.95);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 8px 40px rgba(46,134,222,0.15);
+      margin-bottom: 16px;
     }
-    .addr-group {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
+    .search-input-wrap {
+      position: relative;
+      margin-bottom: 14px;
     }
-    .addr-group label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #7799bb;
+    .search-input-icon {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1rem;
+      pointer-events: none;
     }
-    .addr-group input {
-      padding: 11px 14px;
-      border: 1.5px solid #b8d4ef;
-      border-radius: 10px;
+    .search-input-wrap input {
+      width: 100%;
+      padding: 14px 14px 14px 44px;
+      border: 2px solid #cce0f8;
+      border-radius: 14px;
       background: #ffffff;
       color: #1a2a3a;
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-family: inherit;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .addr-group input::placeholder { color: #aabbd0; }
-    .addr-group input:focus {
+    .search-input-wrap input::placeholder { color: #9ab8d8; }
+    .search-input-wrap input:focus {
       border-color: #2e86de;
-      box-shadow: 0 0 0 3px rgba(46,134,222,0.15);
+      box-shadow: 0 0 0 4px rgba(46,134,222,0.12);
     }
-
     .search-btn {
-      padding: 11px 22px;
+      width: 100%;
+      padding: 14px;
       border: none;
-      border-radius: 10px;
+      border-radius: 14px;
       background: linear-gradient(135deg, #2e86de, #1a6fc4);
       color: #fff;
-      font-size: 0.95rem;
+      font-size: 1rem;
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
-      box-shadow: 0 4px 14px rgba(46,134,222,0.4);
-      white-space: nowrap;
+      transition: all 0.2s;
+      box-shadow: 0 4px 18px rgba(46,134,222,0.4);
+      letter-spacing: 0.3px;
     }
-    .search-btn:hover { opacity: 0.9; box-shadow: 0 6px 20px rgba(46,134,222,0.5); }
-    .search-btn:active { transform: scale(0.97); }
+    .search-btn:hover { box-shadow: 0 8px 28px rgba(46,134,222,0.5); transform: translateY(-1px); }
+    .search-btn:active { transform: scale(0.98); }
 
-    .filter-row {
+    /* ── Filter chips ── */
+    .filters-wrap {
+      width: 100%;
+      max-width: 620px;
+      margin-bottom: 32px;
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
       gap: 10px;
       flex-wrap: wrap;
-      width: 100%;
-      max-width: 720px;
-      margin-bottom: 20px;
-      align-items: center;
-      background: rgba(255,255,255,0.45);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.7);
-      border-radius: 12px;
-      padding: 12px 16px;
-      box-shadow: 0 2px 12px rgba(46,134,222,0.07);
     }
-    .filter-row label {
-      font-size: 0.7rem;
+    .filter-label {
+      font-size: 0.68rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #7799bb;
+      color: #8899bb;
+      min-width: 46px;
     }
-    .filter-row select {
-      padding: 7px 12px;
-      border: 1.5px solid #b8d4ef;
-      border-radius: 8px;
-      background: #fff;
-      color: #1a2a3a;
-      font-size: 0.88rem;
-      font-family: inherit;
-      outline: none;
+    .chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: border-color 0.2s;
+      border: 2px solid rgba(46,134,222,0.18);
+      background: rgba(255,255,255,0.7);
+      color: #4a7aaa;
+      transition: all 0.2s;
+      user-select: none;
+      white-space: nowrap;
     }
-    .filter-row select:focus { border-color: #2e86de; }
+    .chip:hover { border-color: #2e86de; color: #1a6fc4; background: rgba(46,134,222,0.06); }
+    .chip.active {
+      background: linear-gradient(135deg, #2e86de, #1a6fc4);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 3px 10px rgba(46,134,222,0.35);
+    }
+    .chip-sm { padding: 5px 12px; font-size: 0.76rem; }
+
+    /* ── Content area ── */
+    .content {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 16px 60px;
+    }
 
     .error {
       color: #e74c3c;
-      font-size: 0.88rem;
-      margin-bottom: 12px;
-      min-height: 20px;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
       text-align: center;
       font-weight: 500;
+      min-height: 22px;
     }
 
-    .spinner {
-      width: 36px; height: 36px;
-      border: 3px solid rgba(46,134,222,0.2);
-      border-top-color: #2e86de;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    /* ── Spinner ── */
+    .spinner-wrap {
       display: none;
-      margin: 20px auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner.active { display: block; }
-
-    .summary-banner {
-      width: 100%;
-      max-width: 1100px;
-      background: linear-gradient(135deg, #2e86de 0%, #1a5fad 100%);
-      border-radius: 18px;
-      padding: 20px 32px;
-      display: none;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: 28px;
-      flex-wrap: wrap;
-      margin-bottom: 24px;
-      box-shadow: 0 8px 32px rgba(46,134,222,0.3);
+      gap: 14px;
+      padding: 48px;
     }
-    .summary-banner.visible { display: flex; }
-    .summary-banner .stat { text-align: center; }
-    .summary-banner .label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: rgba(255,255,255,0.65);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 5px;
+    .spinner-wrap.active { display: flex; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid rgba(46,134,222,0.15);
+      border-top-color: #2e86de;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
     }
-    .summary-banner .value {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: #ffffff;
-      line-height: 1;
-    }
-    .summary-banner .sub-value {
-      font-size: 0.82rem;
-      color: rgba(255,255,255,0.6);
-      margin-top: 3px;
-    }
-    .summary-banner .sep { width: 1px; height: 52px; background: rgba(255,255,255,0.2); }
+    .spinner-text { font-size: 0.9rem; color: #7799bb; font-weight: 500; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .map-wrap {
-      width: 100%;
-      max-width: 1100px;
-      margin-bottom: 24px;
+    /* ── Summary bar ── */
+    .summary-bar {
       display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #2364b0 0%, #1a5fad 100%);
+      border-radius: 20px;
+      padding: 20px 28px;
+      margin-bottom: 22px;
+      box-shadow: 0 8px 36px rgba(46,134,222,0.28);
+      flex-wrap: wrap;
+      gap: 14px;
     }
+    .summary-bar.visible { display: flex; }
+    .summary-left { display: flex; align-items: center; gap: 14px; }
+    .summary-icon { font-size: 2rem; }
+    .summary-location { color: #fff; }
+    .summary-location .loc-name { font-size: 1.15rem; font-weight: 800; line-height: 1.2; }
+    .summary-location .loc-sub  { font-size: 0.76rem; color: rgba(255,255,255,0.6); margin-top: 3px; }
+    .summary-count {
+      background: rgba(255,255,255,0.18);
+      border-radius: 14px;
+      padding: 12px 22px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .count-num   { font-size: 1.7rem; font-weight: 900; color: #fff; line-height: 1; }
+    .count-label { font-size: 0.65rem; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+
+    /* ── Map ── */
+    .map-wrap { display: none; margin-bottom: 24px; }
     .map-wrap.visible { display: block; }
-    .map-label {
-      font-size: 0.7rem;
+    #map {
+      width: 100%;
+      height: 400px;
+      border-radius: 20px;
+      border: 1px solid rgba(200,223,245,0.5);
+      overflow: hidden;
+      box-shadow: 0 8px 36px rgba(46,134,222,0.15);
+    }
+
+    /* ── Card grid ── */
+    .section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1.2px;
       color: #8899bb;
-      margin-bottom: 10px;
-      font-weight: 700;
-    }
-    #map {
-      width: 100%;
-      height: 420px;
-      border-radius: 18px;
-      border: 1px solid rgba(200,223,245,0.6);
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(46,134,222,0.15);
-    }
-
-    .rest-wrap {
-      width: 100%;
-      max-width: 1100px;
-      display: none;
-      border-radius: 18px;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(46,134,222,0.12);
-    }
-    .rest-wrap.visible { display: block; }
-
-    .rest-header {
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      background: linear-gradient(135deg, #ffffff, #f4f9ff);
-      border: 1px solid #d0e8f8;
-      border-bottom: none;
-      border-radius: 18px 18px 0 0;
-      padding: 16px 24px;
+      gap: 10px;
     }
-    .rest-header span { font-size: 1rem; font-weight: 700; color: #1a3a5c; }
-    .rest-loading { font-size: 0.78rem; color: #7799bb; font-weight: 500; }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(46,134,222,0.12);
+    }
 
-    .rest-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #ffffff;
-      border: 1px solid #d0e8f8;
-      border-top: none;
-      border-radius: 0 0 18px 18px;
-      overflow: hidden;
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 16px;
     }
-    .rest-table thead th {
-      background: linear-gradient(135deg, #f0f7ff, #e8f2ff);
-      padding: 11px 16px;
-      font-size: 0.68rem;
+
+    .rest-card {
+      background: rgba(255,255,255,0.84);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.95);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 4px 22px rgba(46,134,222,0.08);
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+      animation: fadeUp 0.4s ease both;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .rest-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 18px 52px rgba(46,134,222,0.18);
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .card-num {
+      min-width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #e8f3ff, #d0e8ff);
+      color: #2e6db4;
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-name {
+      font-size: 1.05rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.9px;
-      color: #6688aa;
-      text-align: left;
-      border-bottom: 1px solid #d0e8f8;
+      color: #1a2a3a;
+      line-height: 1.3;
     }
-    .rest-table tbody tr { border-bottom: 1px solid #eef5fb; transition: background 0.15s; }
-    .rest-table tbody tr:nth-child(even) { background: #fafcff; }
-    .rest-table tbody tr:last-child { border-bottom: none; }
-    .rest-table tbody tr:hover { background: #f0f7ff; }
-    .rest-table tbody td { padding: 13px 16px; font-size: 0.88rem; color: #1a3a5c; vertical-align: middle; }
 
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .cuisine-badge {
       display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.68rem;
+      padding: 4px 11px;
+      border-radius: 100px;
+      font-size: 0.7rem;
       font-weight: 700;
-      background: linear-gradient(135deg, #e8f3ff, #daeeff);
+      background: linear-gradient(135deg, #e8f3ff, #d8edff);
       color: #2e6db4;
-      border: 1px solid #c0dcf5;
+      border: 1px solid #bcd9f4;
       letter-spacing: 0.3px;
+      text-transform: capitalize;
+    }
+    .dist-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #7799bb;
     }
 
     .open-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.68rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 13px;
+      border-radius: 100px;
+      font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.3px;
     }
-    .open-yes     { background: #d5ffe8; color: #00854d; border: 1px solid #80d8a8; }
-    .open-no      { background: #ffd5d5; color: #c0392b; border: 1px solid #e08080; }
-    .open-unknown { background: #f0f0f0; color: #7799bb; border: 1px solid #ccddef; }
+    .open-yes     { background: #d4fae8; color: #00804a; border: 1px solid #7dd8a8; }
+    .open-no      { background: #ffd8d8; color: #c0392b; border: 1px solid #e08888; }
+    .open-unknown { background: #f0f4f8; color: #8899bb; border: 1px solid #c8d8ec; }
+    .dot { font-size: 0.55rem; }
 
-    .hours-text { font-size: 0.76rem; color: #6688aa; line-height: 1.5; }
+    .card-hours {
+      font-size: 0.76rem;
+      color: #6688aa;
+      line-height: 1.65;
+      padding: 10px 14px;
+      background: rgba(46,134,222,0.04);
+      border-radius: 10px;
+      border: 1px solid rgba(46,134,222,0.09);
+    }
 
+    .card-footer { margin-top: auto; }
     .map-pin-link {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       color: #2e86de;
       text-decoration: none;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 0.82rem;
-      padding: 4px 10px;
-      border-radius: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
       background: rgba(46,134,222,0.08);
-      transition: background 0.2s;
+      transition: all 0.2s;
+      border: 1px solid rgba(46,134,222,0.14);
     }
-    .map-pin-link:hover { background: rgba(46,134,222,0.16); }
+    .map-pin-link:hover { background: rgba(46,134,222,0.15); transform: translateX(2px); }
 
+    /* ── No results ── */
+    .no-results {
+      text-align: center;
+      padding: 64px 20px;
+      color: #8899bb;
+    }
+    .no-results .no-icon { font-size: 3.2rem; margin-bottom: 14px; }
+    .no-results p { font-size: 0.95rem; font-weight: 500; }
+
+    /* ── Responsive ── */
     @media (max-width: 860px) {
-      .summary-banner { gap: 16px; padding: 14px 16px; }
-      .summary-banner .sep { display: none; }
-      .rest-table thead th:nth-child(6),
-      .rest-table tbody td:nth-child(6) { display: none; }
+      .card-grid { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
     }
     @media (max-width: 600px) {
-      body { padding: 20px 10px 40px; }
-      h1 { font-size: 1.6rem; }
-      nav { flex-wrap: wrap; padding: 6px; }
+      h1 { font-size: 2rem; }
+      .hero { padding: 32px 16px 20px; }
+      nav { flex-wrap: wrap; }
       nav a { font-size: 0.82rem; padding: 7px 14px; }
-      .search-row { flex-wrap: wrap; gap: 10px; padding: 12px; }
-      .addr-group input { font-size: 0.95rem; }
-      .search-btn { width: 100%; }
-      .filter-row { gap: 8px; padding: 10px 12px; }
-      .filter-row select { font-size: 0.85rem; }
-      .summary-banner .value { font-size: 1.3rem; }
+      .search-card { padding: 16px; border-radius: 18px; }
+      .card-grid { grid-template-columns: 1fr; }
       #map { height: 280px; }
-      .rest-wrap { overflow-x: auto; border-radius: 14px; }
-      .rest-table { min-width: 480px; }
+      .summary-bar { padding: 14px 18px; }
+      .count-num { font-size: 1.4rem; }
     }
     @media (max-width: 400px) {
-      #map { height: 220px; }
-      .rest-table { min-width: 420px; }
+      h1 { font-size: 1.75rem; }
+      #map { height: 240px; }
     }
   </style>
 </head>
 <body>
 
-  <nav>
-    <a href="index.html">Enroute Weather</a>
-    <a href="restaurants.html" class="active">Restaurants</a>
-  </nav>
-
-  <h1>Nearby Restaurants</h1>
-  <p class="subtitle">Find restaurants near any US location</p>
-
-  <div class="search-row">
-    <div class="addr-group">
-      <label>Location</label>
-      <input type="text" id="addr" value="Chicago, IL" autocomplete="off" placeholder="e.g. Chicago, IL" />
-    </div>
-    <button class="search-btn" id="searchBtn">Search</button>
+  <div class="nav-wrap">
+    <nav>
+      <a href="index.html">Enroute Weather</a>
+      <a href="restaurants.html" class="active">Restaurants</a>
+    </nav>
   </div>
 
-  <div class="filter-row">
-    <label>Cuisine:</label>
-    <select id="cuisineFilter">
-      <option value="">All</option>
-      <option value="american">American</option>
-      <option value="pizza">Pizza</option>
-      <option value="burger">Burger</option>
-      <option value="mexican">Mexican</option>
-      <option value="chinese">Chinese</option>
-      <option value="italian">Italian</option>
-      <option value="sandwich">Sandwich</option>
-      <option value="coffee_shop">Coffee</option>
-      <option value="fast_food">Fast Food</option>
-      <option value="indian">Indian</option>
-    </select>
-    <label>Radius:</label>
-    <select id="radiusFilter">
-      <option value="805">0.5 mi</option>
-      <option value="1609" selected>1 mi</option>
-      <option value="3219">2 mi</option>
-      <option value="8047">5 mi</option>
-    </select>
-  </div>
+  <div class="hero">
+    <div class="hero-icon">🍽️</div>
+    <h1>Nearby Restaurants</h1>
+    <p class="subtitle">Discover dining options around any US location</p>
 
-  <div class="error" id="errorMsg"></div>
-  <div class="spinner" id="spinner"></div>
-
-  <div class="summary-banner" id="summaryBanner">
-    <div class="stat">
-      <div class="label">Location</div>
-      <div class="value" style="font-size:1.1rem" id="locName">--</div>
-      <div class="sub-value" id="locSub">--</div>
+    <div class="search-card">
+      <div class="search-input-wrap">
+        <span class="search-input-icon">📍</span>
+        <input type="text" id="addr" value="Chicago, IL" autocomplete="off" placeholder="Enter city, address, or zip code" />
+      </div>
+      <button class="search-btn" id="searchBtn">Find Restaurants</button>
     </div>
-    <div class="sep"></div>
-    <div class="stat">
-      <div class="label">Restaurants Found</div>
-      <div class="value" id="restCount">--</div>
-      <div class="sub-value">within radius</div>
+
+    <div class="filters-wrap">
+      <div class="filter-group">
+        <span class="filter-label">Cuisine</span>
+        <div class="chips" id="cuisineChips">
+          <span class="chip active" data-value="">All</span>
+          <span class="chip" data-value="american">American</span>
+          <span class="chip" data-value="pizza">Pizza</span>
+          <span class="chip" data-value="burger">Burger</span>
+          <span class="chip" data-value="mexican">Mexican</span>
+          <span class="chip" data-value="chinese">Chinese</span>
+          <span class="chip" data-value="italian">Italian</span>
+          <span class="chip" data-value="sandwich">Sandwich</span>
+          <span class="chip" data-value="coffee_shop">Coffee</span>
+          <span class="chip" data-value="fast_food">Fast Food</span>
+          <span class="chip" data-value="indian">Indian</span>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Radius</span>
+        <div class="chips" id="radiusChips">
+          <span class="chip chip-sm" data-value="805">0.5 mi</span>
+          <span class="chip chip-sm active" data-value="1609">1 mi</span>
+          <span class="chip chip-sm" data-value="3219">2 mi</span>
+          <span class="chip chip-sm" data-value="8047">5 mi</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="map-wrap" id="mapWrap">
-    <div class="map-label">Map</div>
-    <div id="map"></div>
-  </div>
+  <div class="content">
+    <div class="error" id="errorMsg"></div>
 
-  <div class="rest-wrap" id="restWrap">
-    <div class="rest-header">
-      <span>🍽️ Nearby Restaurants</span>
-      <span class="rest-loading" id="restLoading"></span>
+    <div class="spinner-wrap" id="spinnerWrap">
+      <div class="spinner"></div>
+      <span class="spinner-text" id="spinnerText">Searching for restaurants…</span>
     </div>
-    <table class="rest-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Name</th>
-          <th>Cuisine</th>
-          <th>Distance</th>
-          <th>Status</th>
-          <th>Hours</th>
-          <th>Map</th>
-        </tr>
-      </thead>
-      <tbody id="restBody"></tbody>
-    </table>
+
+    <div class="summary-bar" id="summaryBanner">
+      <div class="summary-left">
+        <div class="summary-icon">📍</div>
+        <div class="summary-location">
+          <div class="loc-name" id="locName">--</div>
+          <div class="loc-sub" id="locSub">--</div>
+        </div>
+      </div>
+      <div class="summary-count">
+        <div class="count-num" id="restCount">--</div>
+        <div class="count-label">Restaurants Found</div>
+      </div>
+    </div>
+
+    <div class="map-wrap" id="mapWrap">
+      <div id="map"></div>
+    </div>
+
+    <div id="resultsArea"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
+    // ── Chip selection ──
+    function setupChips(groupId) {
+      document.getElementById(groupId).addEventListener('click', e => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        document.getElementById(groupId).querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    }
+    setupChips('cuisineChips');
+    setupChips('radiusChips');
+
+    function getChipValue(groupId) {
+      const active = document.getElementById(groupId).querySelector('.chip.active');
+      return active ? active.dataset.value : '';
+    }
+
+    // ── Utilities ──
     function haversine(lat1, lon1, lat2, lon2) {
       const R = 3958.8;
       const toRad = d => d * Math.PI / 180;
@@ -465,6 +555,7 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    // ── Geocoding ──
     async function fetchGeo(address) {
       const url = `https://nominatim.openstreetmap.org/search?` +
         new URLSearchParams({ q: address, countrycodes: 'us', format: 'json', limit: 1, addressdetails: 1 });
@@ -483,6 +574,7 @@
       };
     }
 
+    // ── Overpass ──
     async function fetchRestaurants(lat, lon, radiusM, cuisine) {
       const cuisineFilter = cuisine ? `["cuisine"~"${cuisine}",i]` : '';
       const query = `
@@ -499,73 +591,43 @@
       return (data.elements || []).filter(r => r.tags && r.tags.name);
     }
 
-    // Parse OSM opening_hours to determine if currently open
+    // ── Opening hours parser ──
     function isOpenNow(oh) {
       if (!oh) return 'unknown';
       if (oh.trim() === '24/7') return 'open';
-
       const now = new Date();
-      const dayIdx = now.getDay(); // 0=Sun, 1=Mon...
       const dayNames = ['su','mo','tu','we','th','fr','sa'];
-      const todayKey = dayNames[dayIdx];
+      const todayKey = dayNames[now.getDay()];
       const curMin = now.getHours() * 60 + now.getMinutes();
-
-      // Normalize and split rules on ";"
-      const rules = oh.toLowerCase().split(';').map(s => s.trim()).filter(Boolean);
-
-      for (const rule of rules) {
-        // Match pattern like: "Mo-Fr 09:00-22:00" or "Sa,Su 10:00-21:00"
+      for (const rule of oh.toLowerCase().split(';').map(s => s.trim()).filter(Boolean)) {
         const m = rule.match(/^([a-z,\-]+)\s+(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
         if (!m) continue;
-
-        const dayPart  = m[1];
-        const openMin  = timeToMin(m[2]);
-        const closeMin = timeToMin(m[3]);
-
-        if (dayMatches(dayPart, todayKey)) {
-          if (curMin >= openMin && curMin < closeMin) return 'open';
-          return 'closed';
+        if (dayMatches(m[1], todayKey)) {
+          const openMin = timeToMin(m[2]), closeMin = timeToMin(m[3]);
+          return (curMin >= openMin && curMin < closeMin) ? 'open' : 'closed';
         }
       }
       return 'unknown';
     }
-
-    function timeToMin(t) {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
-    }
-
+    function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
     const DAY_IDX = { mo:0, tu:1, we:2, th:3, fr:4, sa:5, su:6 };
-
     function dayMatches(dayPart, todayKey) {
-      // Handle comma-separated groups: "mo,we,fr"
-      for (const segment of dayPart.split(',')) {
-        const s = segment.trim();
+      for (const s of dayPart.split(',').map(x => x.trim())) {
         if (s.includes('-')) {
           const [from, to] = s.split('-');
           const fi = DAY_IDX[from], ti = DAY_IDX[to], ci = DAY_IDX[todayKey];
-          if (fi !== undefined && ti !== undefined && ci !== undefined) {
-            if (fi <= ti ? (ci >= fi && ci <= ti) : (ci >= fi || ci <= ti)) return true;
-          }
-        } else if (s === todayKey) {
-          return true;
-        }
+          if (fi !== undefined && ti !== undefined && ci !== undefined &&
+              (fi <= ti ? (ci >= fi && ci <= ti) : (ci >= fi || ci <= ti))) return true;
+        } else if (s === todayKey) return true;
       }
       return false;
     }
-
     function cuisineLabel(tags) {
-      return tags.cuisine
-        ? tags.cuisine.replace(/_/g, ' ').replace(/;.*/,'').trim()
-        : 'Restaurant';
+      return tags.cuisine ? tags.cuisine.replace(/_/g,' ').replace(/;.*/,'').trim() : 'Restaurant';
     }
 
     // ── Map ──
-    let map = null;
-    let layerGroup = null;
-    let restLayerGroup = null;
-    let restIcon = null;
-
+    let map = null, layerGroup = null, restLayerGroup = null, restIcon = null;
     function initMap() {
       if (map) return;
       map = L.map('map', { center: [39.5, -98.35], zoom: 13, scrollWheelZoom: true });
@@ -573,7 +635,7 @@
         attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
         subdomains: 'abcd', maxZoom: 19,
       }).addTo(map);
-      layerGroup    = L.layerGroup().addTo(map);
+      layerGroup     = L.layerGroup().addTo(map);
       restLayerGroup = L.layerGroup().addTo(map);
       restIcon = L.divIcon({
         className: '',
@@ -581,7 +643,6 @@
         iconSize: [22,22], iconAnchor: [11,11], popupAnchor: [0,-13],
       });
     }
-
     function makeIcon(color) {
       return L.divIcon({
         className: '',
@@ -589,134 +650,127 @@
         iconSize: [16,16], iconAnchor: [8,8], popupAnchor: [0,-10],
       });
     }
-
     function renderMap(geo, restaurants) {
       initMap();
       layerGroup.clearLayers();
       restLayerGroup.clearLayers();
-
-      // Center marker
       L.marker([geo.lat, geo.lon], { icon: makeIcon('#ff3d3d') })
         .bindPopup(`<strong>${geo.display}</strong>`).addTo(layerGroup).openPopup();
-
-      // Restaurant markers
       for (const r of restaurants) {
-        const name    = r.tags.name || 'Restaurant';
-        const cuisine = cuisineLabel(r.tags);
         L.marker([r.lat, r.lon], { icon: restIcon })
-          .bindPopup(`<strong>${name}</strong><br><em>${cuisine}</em>`)
+          .bindPopup(`<strong>${r.tags.name}</strong><br><em>${cuisineLabel(r.tags)}</em>`)
           .addTo(restLayerGroup);
       }
-
       map.setView([geo.lat, geo.lon], 14);
     }
 
-    // ── Main ──
+    // ── Render cards ──
+    function renderCards(restaurants, geo) {
+      const area = document.getElementById('resultsArea');
+      if (!restaurants.length) {
+        area.innerHTML = `
+          <div class="no-results">
+            <div class="no-icon">🔍</div>
+            <p>No restaurants found. Try increasing the radius or removing the cuisine filter.</p>
+          </div>`;
+        return;
+      }
+
+      const cards = restaurants.map((r, idx) => {
+        const name       = r.tags.name || '—';
+        const cuisine    = cuisineLabel(r.tags);
+        const distMi     = haversine(geo.lat, geo.lon, r.lat, r.lon);
+        const distStr    = distMi < 0.1 ? `${Math.round(distMi * 5280)} ft` : `${distMi.toFixed(2)} mi`;
+        const openStatus = isOpenNow(r.tags.opening_hours);
+        const openHTML   = openStatus === 'open'
+          ? '<span class="open-badge open-yes"><span class="dot">●</span> Open now</span>'
+          : openStatus === 'closed'
+          ? '<span class="open-badge open-no"><span class="dot">●</span> Closed</span>'
+          : '<span class="open-badge open-unknown"><span class="dot">●</span> Hours unknown</span>';
+        const hoursText  = r.tags.opening_hours
+          ? r.tags.opening_hours.replace(/;/g, '<br>') : null;
+        const mapsUrl    = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}&zoom=17`;
+
+        return `
+          <div class="rest-card" style="animation-delay:${Math.min(idx * 40, 500)}ms">
+            <div class="card-top">
+              <div class="card-num">${idx + 1}</div>
+              <div class="card-name">${name}</div>
+            </div>
+            <div class="card-meta">
+              <span class="cuisine-badge">${cuisine}</span>
+              <span class="dist-badge">📍 ${distStr}</span>
+            </div>
+            <div>${openHTML}</div>
+            ${hoursText ? `<div class="card-hours">${hoursText}</div>` : ''}
+            <div class="card-footer">
+              <a class="map-pin-link" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ View on Map →</a>
+            </div>
+          </div>`;
+      }).join('');
+
+      area.innerHTML = `
+        <div class="section-title">Restaurants (${restaurants.length})</div>
+        <div class="card-grid">${cards}</div>`;
+    }
+
+    // ── Search ──
     function showError(msg) {
       document.getElementById('errorMsg').textContent = msg;
       document.getElementById('summaryBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
-      document.getElementById('restWrap').classList.remove('visible');
+      document.getElementById('resultsArea').innerHTML = '';
     }
 
     async function search() {
       const addr    = document.getElementById('addr').value.trim();
-      const cuisine = document.getElementById('cuisineFilter').value;
-      const radiusM = parseInt(document.getElementById('radiusFilter').value, 10);
+      const cuisine = getChipValue('cuisineChips');
+      const radiusM = parseInt(getChipValue('radiusChips') || '1609', 10);
 
       if (!addr) { showError('Please enter a location.'); return; }
 
       document.getElementById('errorMsg').textContent = '';
-      document.getElementById('spinner').classList.add('active');
+      document.getElementById('spinnerWrap').classList.add('active');
+      document.getElementById('spinnerText').textContent = 'Finding your location…';
       document.getElementById('summaryBanner').classList.remove('visible');
       document.getElementById('mapWrap').classList.remove('visible');
-      document.getElementById('restWrap').classList.remove('visible');
+      document.getElementById('resultsArea').innerHTML = '';
 
       try {
         const geo = await fetchGeo(addr);
 
-        // Show map
         document.getElementById('mapWrap').classList.add('visible');
         renderMap(geo, []);
         map.invalidateSize();
 
-        // Show table shell
-        const restBody    = document.getElementById('restBody');
-        const restLoading = document.getElementById('restLoading');
-        restBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7799bb;padding:16px">Searching for nearby restaurants…</td></tr>';
-        restLoading.textContent = 'searching…';
-        document.getElementById('restWrap').classList.add('visible');
+        document.getElementById('spinnerText').textContent = 'Searching for nearby restaurants…';
 
         const restaurants = await fetchRestaurants(geo.lat, geo.lon, radiusM, cuisine);
-
-        // Sort by distance
         restaurants.sort((a, b) =>
           haversine(geo.lat, geo.lon, a.lat, a.lon) -
           haversine(geo.lat, geo.lon, b.lat, b.lon)
         );
 
-        // Update map with restaurants
         renderMap(geo, restaurants);
         map.invalidateSize();
 
-        // Summary banner
         document.getElementById('locName').textContent = geo.city
           ? `${geo.city}${geo.state ? ', ' + geo.state : ''}` : geo.display;
         document.getElementById('locSub').textContent = geo.display;
         document.getElementById('restCount').textContent = restaurants.length;
         document.getElementById('summaryBanner').classList.add('visible');
 
-        if (!restaurants.length) {
-          restBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#7799bb;padding:16px">No restaurants found. Try increasing the radius or removing the cuisine filter.</td></tr>';
-          restLoading.textContent = '0 found';
-          return;
-        }
-
-        restBody.innerHTML = '';
-        restaurants.forEach((r, idx) => {
-          const name      = r.tags.name || '—';
-          const cuisine   = cuisineLabel(r.tags);
-          const distMi    = haversine(geo.lat, geo.lon, r.lat, r.lon);
-          const distStr   = distMi < 0.1
-            ? `${Math.round(distMi * 5280)} ft`
-            : `${distMi.toFixed(2)} mi`;
-          const openStatus = isOpenNow(r.tags.opening_hours);
-          const openHTML  = openStatus === 'open'
-            ? '<span class="open-badge open-yes">Open</span>'
-            : openStatus === 'closed'
-            ? '<span class="open-badge open-no">Closed</span>'
-            : '<span class="open-badge open-unknown">Unknown</span>';
-          const hoursText = r.tags.opening_hours
-            ? r.tags.opening_hours.replace(/;/g, '<br>')
-            : '<span style="color:#aabbcc">—</span>';
-          const mapsUrl   = `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}&zoom=17`;
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${idx + 1}</td>
-            <td style="font-weight:600">${name}</td>
-            <td><span class="cuisine-badge">${cuisine}</span></td>
-            <td>${distStr}</td>
-            <td>${openHTML}</td>
-            <td class="hours-text">${hoursText}</td>
-            <td><a class="map-pin-link" href="${mapsUrl}" target="_blank" rel="noopener">View Map</a></td>
-          `;
-          restBody.appendChild(tr);
-        });
-
-        restLoading.textContent = `${restaurants.length} found`;
+        renderCards(restaurants, geo);
 
       } catch (err) {
         showError(err.message || 'Something went wrong. Please try again.');
       } finally {
-        document.getElementById('spinner').classList.remove('active');
+        document.getElementById('spinnerWrap').classList.remove('active');
       }
     }
 
     document.getElementById('searchBtn').addEventListener('click', search);
-    document.getElementById('addr').addEventListener('keydown', e => {
-      if (e.key === 'Enter') search();
-    });
+    document.getElementById('addr').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
   </script>
 </body>
 </html>
